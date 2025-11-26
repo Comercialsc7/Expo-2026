@@ -1,0 +1,55 @@
+{
+  "name": "Sistema Expo2025",
+  "short_name": "Expo2025",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#003B71",
+  "theme_color": "#003B71",
+  "description": "Sistema de vendas Expo2025",
+  "categories": ["business", "productivity"],
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/assets/images/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/images/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Novo Pedido",
+      "short_name": "Pedido",
+      "description": "Criar um novo pedido",
+      "url": "/(tabs)/create-order",
+      "icons": [
+        {
+          "src": "/assets/images/icon.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Ver Pedidos",
+      "short_name": "Pedidos",
+      "description": "Visualizar pedidos",
+      "url": "/(app)/orders",
+      "icons": [
+        {
+          "src": "/assets/images/icon.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+} 

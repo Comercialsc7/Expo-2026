@@ -1,0 +1,39 @@
+{
+  "background_color": "#466cd5",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Expo26",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Expo26",
+  "start_url": "/",
+  "theme_color": "#4170c3",
+  "icons": [
+    {
+      "src": "https://comercialsc7-sistema-f98y.bolt.host/favicon.ico",
+      "type": "image/x-icon",
+      "isSquare": false,
+      "isPng": false,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 0,
+      "is512x512": false,
+      "is256x256": false,
+      "is192x192": false
+    },
+    {
+      "src": "https://comercialsc7-sistema-f98y.bolt.host/favicon.ico",
+      "type": "image/x-icon",
+      "isSquare": false,
+      "isPng": false,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 0,
+      "is512x512": false,
+      "is256x256": false,
+      "is192x192": false
+    }
+  ],
+  "id": "EXPOdmuller",
+  "description": "Sistema Dmuller para a feira de exposição."
+}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+
+  <!-- PWA Meta Tags -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Expo2025" />
+  <meta name="application-name" content="Sistema Expo2025" />
+  <meta name="theme-color" content="#003B71" />
+  <meta name="description" content="Sistema de vendas Expo2025" />
+
+  <!-- Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" sizes="196x196" href="/assets/images/icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icon.png" />
+
+  <title>Sistema Expo2025</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    html, body, #root {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+    }
+    #root {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Loading screen */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #003B71;
+    }
+    .loading-text {
+      color: #FFFFFF;
+      font-size: 18px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <noscript>Você precisa habilitar JavaScript para executar este aplicativo.</noscript>
+
+  <div id="root">
+    <div class="loading">
+      <p class="loading-text">Carregando...</p>
+    </div>
+  </div>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker
+          .register('/service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registrado com sucesso:', registration.scope);
+          })
+          .catch(error => {
+            console.error('Erro ao registrar Service Worker:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
