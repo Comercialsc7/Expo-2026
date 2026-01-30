@@ -61,13 +61,13 @@ if (typeof window !== 'undefined') {
             fields: ['table'],
           },
         }).catch((err: any) => {
-          console.error('Error creating PouchDB index:', err);
+          console.warn('⚠️ Não foi possível criar índice PouchDB:', err);
         });
 
         console.log('✅ PouchDB inicializado com sucesso');
-      } catch (initError) {
-        console.error('Erro ao criar instância do PouchDB:', initError);
-        throw initError;
+      } catch (initError: any) {
+        console.warn('⚠️ PouchDB não pode ser inicializado (storage bloqueado):', initError.message);
+        db = null;
       }
     } else {
       throw new Error(`PouchDB não é uma função construtora. Valor recebido: ${typeof PouchDBModule}`);
