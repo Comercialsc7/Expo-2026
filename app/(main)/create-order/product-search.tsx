@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Animated, { 
+import Animated, {
   SlideInUp,
   Layout,
   FadeIn
@@ -66,7 +66,7 @@ export default function ProductSearch() {
       isAccelerator: product.is_accelerator,
       paymentTerm: selectedPaymentTerm
     });
-    router.push('/(tabs)/create-order');
+    router.push('/(main)/create-order');
   };
 
   return (
@@ -112,7 +112,7 @@ export default function ProductSearch() {
                 {product.is_accelerator ? (
                   <Image source={Diamond} style={styles.productAcceleratorIcon} />
                 ) : (
-                  <Text style={{width: 30}}></Text>
+                  <Text style={{ width: 30 }}></Text>
                 )}
               </View>
               <Text style={styles.productName}>{product.name}</Text>

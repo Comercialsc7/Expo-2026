@@ -53,7 +53,7 @@ export default function Login() {
         const { count, error: countError } = await supabase
           .from('teams')
           .select('*', { count: 'exact', head: true });
-        
+
         if (countError) {
           console.warn('⚠️ Erro ao contar equipes:', countError);
         } else {
@@ -87,12 +87,12 @@ export default function Login() {
         console.log(`✅ Equipes carregadas do Supabase: ${data?.length || 0} equipes`);
         console.log(`📊 Contagem esperada: ${count || 'desconhecida'}`);
         console.log(`📊 Contagem retornada na query: ${returnedCount || 'não disponível'}`);
-        
+
         if (count && data && data.length < count) {
           console.warn(`⚠️ ATENÇÃO: Esperávamos ${count} equipes, mas recebemos apenas ${data.length}`);
           console.warn('⚠️ Possíveis causas: RLS (Row Level Security) ou limite do Supabase');
         }
-        
+
         if (data && data.length > 0) {
           console.log('📋 Lista de equipes retornadas:');
           data.forEach((team, index) => {
@@ -101,7 +101,7 @@ export default function Login() {
         } else {
           console.warn('⚠️ Nenhuma equipe foi retornada do Supabase!');
         }
-        
+
         setTeams(data || []);
 
         // Salva no cache para uso offline (sempre atualiza o cache)
@@ -136,8 +136,8 @@ export default function Login() {
         console.log('📦 Usando cache como fallback');
         setTeams(cachedTeams);
         setIsOffline(true);
-        } else {
-          Alert.alert('Erro', 'Ocorreu um erro ao carregar as equipes. Verifique sua conexão.');
+      } else {
+        Alert.alert('Erro', 'Ocorreu um erro ao carregar as equipes. Verifique sua conexão.');
       }
     } finally {
       setLoadingTeams(false);
@@ -158,12 +158,16 @@ export default function Login() {
       return;
     }
 
-    try {
-      const online = Platform.OS === 'web' ? navigator.onLine : true;
+    let performOfflineLogin = false;
 
-      if (online) {
-        // LOGIN ONLINE
-        // 1. Obter o ID real da equipe na tabela 'teams' usando o código da equipe selecionado
+    // Tenta Login Online Primeiro
+    const online = Platform.OS === 'web' ? navigator.onLine : true;
+
+    if (online) {
+      try {
+        console.log('🔵 Tentando login online...');
+
+        // 1. Obter o ID real da equipe
         const { data: teamData, error: teamError } = await supabase
           .from('teams')
           .select('id')
@@ -171,9 +175,8 @@ export default function Login() {
           .single();
 
         if (teamError) {
-          console.error('Erro ao buscar ID da equipe:', teamError);
-          Alert.alert('Erro', 'Ocorreu um erro ao buscar informações da equipe. Tente novamente.');
-          return;
+          console.warn('⚠️ Falha no login online (Equipe):', teamError.message);
+          throw new Error('Network/Supabase Error'); // Força ida para o catch/offline
         }
 
         if (!teamData) {
@@ -181,7 +184,7 @@ export default function Login() {
           return;
         }
 
-        // 2. Verificar o código do representante e o ID da equipe real na tabela 'users'
+        // 2. Verificar credenciais
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('id, user_id, team_id, name')
@@ -189,9 +192,8 @@ export default function Login() {
           .eq('team_id', selectedTeam);
 
         if (userError) {
-          console.error('Erro ao buscar usuário:', userError);
-          Alert.alert('Erro', 'Ocorreu um erro ao verificar suas credenciais. Tente novamente.');
-          return;
+          console.warn('⚠️ Falha no login online (User):', userError.message);
+          throw new Error('Network/Supabase Error');
         }
 
         if (!userData || userData.length === 0) {
@@ -199,114 +201,77 @@ export default function Login() {
           return;
         }
 
+        // SUCESSO ONLINE
         const foundUser = userData[0];
-        const representativeCodeToStore = foundUser.user_id;
-        const representativeNameToStore = foundUser.name;
 
-        // 3. Salvar credenciais no AsyncStorage
+        // Salva persistência
         await AsyncStorage.setItem('selectedTeamCode', String(selectedTeam));
+        await AsyncStorage.setItem('representativeCodeToStore', foundUser.user_id);
+        await AsyncStorage.setItem('representanteNome', foundUser.name);
 
+        // Salva histórico de códigos
         const codigosSalvosStr = await AsyncStorage.getItem('codigosRepresentante');
         let codigosArray = codigosSalvosStr ? JSON.parse(codigosSalvosStr) : [];
-
-        if (!codigosArray.includes(representativeCodeToStore)) {
-          codigosArray.push(representativeCodeToStore);
+        if (!codigosArray.includes(foundUser.user_id)) {
+          codigosArray.push(foundUser.user_id);
           await AsyncStorage.setItem('codigosRepresentante', JSON.stringify(codigosArray));
         }
 
-        await AsyncStorage.setItem('representativeCodeToStore', representativeCodeToStore);
-        await AsyncStorage.setItem('representanteNome', representativeNameToStore);
-
-        // 4. Cachear dados do usuário para uso offline
+        // Cachear usuário para futuro offline
         await TableStore.set('users', userData);
-        console.log('💾 Dados do usuário salvos no cache');
+        console.log('✅ Login Online Sucesso. Usuário cacheado.');
 
-        console.log('✅ Login online bem-sucedido');
-        console.log('Código do representante:', representativeCodeToStore);
-        console.log('Nome do representante:', representativeNameToStore);
-
-        // 5. Preparar app para modo offline (em background)
-        console.log('🔄 Preparando app para modo offline...');
+        // Dispara preparação do cache em background
         OfflineCache.prepare([
-          'teams',
-          'products',
-          'clients',
-          'brands'
-        ]).then(result => {
-          if (result.success) {
-            console.log('✅ App preparado para modo offline!');
-          } else {
-            console.warn('⚠️ Preparação offline concluída com erros:', result.errors);
-          }
-        }).catch(err => {
-          console.error('❌ Erro ao preparar modo offline:', err);
-        });
+          'teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo'
+        ]).catch(console.error);
 
         router.push('/(app)/orders');
-      } else {
-        // LOGIN OFFLINE
-        console.log('🔴 Tentando login offline...');
+        return;
 
-        // Busca usuários do cache
+      } catch (error) {
+        console.log('⚠️ Login online falhou, tentando fallback offline...', error);
+        performOfflineLogin = true;
+      }
+    } else {
+      performOfflineLogin = true;
+    }
+
+    // Login Offline (Fallback ou Direto)
+    if (performOfflineLogin) {
+      console.log('🔴 Executando login offline...');
+
+      try {
         const cachedUsers = await TableStore.get('users');
 
         if (!cachedUsers || cachedUsers.length === 0) {
           Alert.alert(
             'Modo Offline',
-            'Você está sem conexão e não há dados em cache. Conecte-se à internet para fazer login pela primeira vez.'
+            'Você está sem conexão e não há dados salvos. É necessário fazer login online pelo menos uma vez.'
           );
           return;
         }
 
-        // Verifica se o usuário existe no cache
+        // Busca no cache (mesma lógica do banco)
+        // Nota: O cache do TableStore salva os objetos como eram no banco
         const foundUser = cachedUsers.find(
-          (u: any) => u.user_id === code && u.team_id === selectedTeam
+          (u: any) => String(u.user_id) === String(code) && (u.team_id == selectedTeam || u.team_code == selectedTeam) // Flexibilidade na busca
         );
 
-        if (!foundUser) {
-          Alert.alert('Erro', 'Código de representante ou equipe inválidos.');
-          return;
+        if (foundUser) {
+          await AsyncStorage.setItem('selectedTeamCode', String(selectedTeam));
+          await AsyncStorage.setItem('representativeCodeToStore', foundUser.user_id);
+          await AsyncStorage.setItem('representanteNome', foundUser.name);
+
+          console.log('✅ Login Offline Sucesso');
+          router.push('/(app)/orders');
+        } else {
+          Alert.alert('Erro Login Offline', 'Usuário não encontrado no cache local. Verifique os dados ou conecte-se à internet.');
         }
-
-        // Salvar credenciais no AsyncStorage
-        await AsyncStorage.setItem('selectedTeamCode', String(selectedTeam));
-        await AsyncStorage.setItem('representativeCodeToStore', foundUser.user_id);
-        await AsyncStorage.setItem('representanteNome', foundUser.name);
-
-        console.log('✅ Login offline bem-sucedido');
-        console.log('Código do representante:', foundUser.user_id);
-        console.log('Nome do representante:', foundUser.name);
-
-        router.push('/(app)/orders');
+      } catch (err) {
+        console.error('Erro fatal no login offline:', err);
+        Alert.alert('Erro', 'Falha ao processar login offline.');
       }
-    } catch (error) {
-      console.error('Erro ao tentar login ou salvar código:', error);
-
-      // Fallback offline em caso de erro
-      try {
-        console.log('🔄 Tentando fallback offline...');
-        const cachedUsers = await TableStore.get('users');
-
-        if (cachedUsers && cachedUsers.length > 0) {
-          const foundUser = cachedUsers.find(
-            (u: any) => u.user_id === code && u.team_id === selectedTeam
-          );
-
-          if (foundUser) {
-            await AsyncStorage.setItem('selectedTeamCode', String(selectedTeam));
-            await AsyncStorage.setItem('representativeCodeToStore', foundUser.user_id);
-            await AsyncStorage.setItem('representanteNome', foundUser.name);
-
-            console.log('✅ Login offline (fallback) bem-sucedido');
-            router.push('/(app)/orders');
-            return;
-          }
-        }
-      } catch (fallbackError) {
-        console.error('Erro no fallback offline:', fallbackError);
-      }
-
-      Alert.alert('Erro', 'Ocorreu um erro inesperado ao fazer login. Tente novamente.');
     }
   };
 
@@ -330,8 +295,8 @@ export default function Login() {
               {teams.length > 0 && (
                 <Text style={styles.teamCount}>({teams.length} equipe{teams.length !== 1 ? 's' : ''})</Text>
               )}
-              <TouchableOpacity 
-                onPress={() => fetchTeams(true)} 
+              <TouchableOpacity
+                onPress={() => fetchTeams(true)}
                 style={styles.refreshButton}
                 disabled={loadingTeams}
               >

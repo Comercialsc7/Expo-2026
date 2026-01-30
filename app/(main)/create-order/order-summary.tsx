@@ -154,13 +154,13 @@ export default function OrderSummaryScreen() {
         </View>
         <View style={styles.bottomSection}>
           {faltaGiro > 0 && (
-             <View style={styles.giroLabelBox}>
+            <View style={styles.giroLabelBox}>
               <Text style={styles.giroLabelText}>Faltam <Text style={styles.giroLabelValue}>R$ {faltaGiro.toFixed(2)}</Text> para o próximo giro da sorte</Text>
             </View>
           )}
 
           {faltaParaMoto > 0 && (
-             <View style={styles.motoLabelBox}>
+            <View style={styles.motoLabelBox}>
               <Text style={styles.motoLabelText}>Faltam <Text style={styles.motoLabelValue}>R$ {faltaParaMoto.toFixed(2)}</Text> para você concorrer a uma moto 0km</Text>
             </View>
           )}
@@ -172,7 +172,7 @@ export default function OrderSummaryScreen() {
         </TouchableOpacity>
         <View style={{ height: 5 }} />
         {girosRestantes > 0 && (
-          <TouchableOpacity style={styles.spinButton} onPress={() => navigateTo('/(tabs)/create-order/spin-wheel', {
+          <TouchableOpacity style={styles.spinButton} onPress={() => navigateTo('/(main)/create-order/spin-wheel', {
             girosDisponiveis: girosRestantes,
             subtotal: subtotal,
             itens: itens,

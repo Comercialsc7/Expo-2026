@@ -20,8 +20,8 @@ export default function CollectEmailScreen() {
     }
 
     router.push({
-      pathname: '/(tabs)/create-order/order-summary',
-      params: { 
+      pathname: '/(main)/create-order/order-summary',
+      params: {
         ...params,
         email: email
       }
@@ -45,7 +45,7 @@ export default function CollectEmailScreen() {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.submitButton}
           onPress={handleSubmit}
         >

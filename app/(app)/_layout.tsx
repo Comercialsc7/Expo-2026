@@ -45,7 +45,6 @@ export default function AppLayout() {
         headerShown: false,
       }}>
         <Stack.Screen name="orders" />
-        <Stack.Screen name="(tabs)" />
       </Stack>
 
       <Sidebar

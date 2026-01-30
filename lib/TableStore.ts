@@ -26,28 +26,29 @@ class TableStore {
     try {
       console.log(`📦 [TableStore] SET iniciado em '${table}' (${items.length} registros)`);
 
-      // Passo 1: Remover todos os registros antigos da tabela
+      // Passo 1: Remover todos os registros antigos da tabela de uma vez
       const oldRecords = await LocalDB.getAll(table);
-      console.log(`🗑️ [TableStore] Removendo ${oldRecords.length} registros antigos`);
-
-      for (const record of oldRecords) {
-        await LocalDB.delete(record._id);
+      if (oldRecords.length > 0) {
+        console.log(`🗑️ [TableStore] Removendo ${oldRecords.length} registros antigos em lote...`);
+        // Prepara os documentos para exclusão
+        await LocalDB.bulkDelete(oldRecords);
       }
 
-      // Passo 2: Inserir novos registros
-      let savedCount = 0;
-      for (const item of items) {
-        try {
-          await LocalDB.save(table, {
-            ...item,
-            _tableStore: true, // Marca como gerenciado pelo TableStore
-            _lastSync: new Date().toISOString(),
-          });
-          savedCount++;
-        } catch (error) {
-          console.error(`❌ [TableStore] Erro ao salvar item:`, error);
-        }
-      }
+      // Passo 2: Preparar e Inserir novos registros em lote
+      // PouchDB aceita o UUID no campo _id. Se o item já tem id, use-o como _id ou prefixe para evitar colisão
+      const timestamp = new Date().toISOString();
+      const recordsToSave = items.map(item => ({
+        _id: item.id || undefined, // Deixa o LocalDB gerar se não tiver, ou usa o ID do item
+        ...item,
+        table, // IMPORTANTE: Garantir o campo table para o index
+        _tableStore: true,
+        _lastSync: timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }));
+
+      console.log(`💾 [TableStore] Salvando ${recordsToSave.length} novos registros em lote...`);
+      const savedCount = await LocalDB.bulkSave(recordsToSave);
 
       console.log(`✅ [TableStore] SET concluído em '${table}' (${savedCount}/${items.length} salvos)`);
       return savedCount;
@@ -114,7 +115,7 @@ class TableStore {
    */
   static async find(table: string, predicate: (item: any) => boolean): Promise<any[]> {
     try {
-      console.log(`🔍 [TableStore] FIND em '${table}'`);
+      console.log(`🔍 [TableStore] FIND (Memory) em '${table}'`);
 
       const items = await this.get(table);
       const filtered = items.filter(predicate);
@@ -123,6 +124,28 @@ class TableStore {
       return filtered;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no FIND de '${table}':`, error);
+      return [];
+    }
+  }
+
+  /**
+   * FIND PRO (Optimized) - Busca registros usando Indices do Banco
+   * Muito mais rápido que o find() normal para grandes volumes
+   *
+   * @param table Nome da tabela
+   * @param selector Query selector (ex: { category: 'bebidas', active: true })
+   */
+  static async findQuery(table: string, selector: any): Promise<any[]> {
+    try {
+      console.log(`🚀 [TableStore] FIND QUERY (Index) em '${table}'`, selector);
+
+      const records = await LocalDB.find(table, selector);
+      const items = records.map(r => r.payload);
+
+      console.log(`✅ [TableStore] FIND QUERY concluído (${items.length} encontrados)`);
+      return items;
+    } catch (error) {
+      console.error(`❌ [TableStore] Erro no FIND QUERY de '${table}':`, error);
       return [];
     }
   }

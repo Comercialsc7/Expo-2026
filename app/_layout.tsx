@@ -48,7 +48,11 @@ export default function RootLayout() {
             'teams',
             'products',
             'clients',
-            'brands'
+            'brands',
+            'users',
+            'pedidos',
+            'prazos',
+            'relacao_prazo'
           ]).then(result => {
             if (result.success) {
               console.log('✅ Cache offline preparado automaticamente!');
@@ -78,7 +82,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(main)" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Platform, Dimensions, FlatList } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MovingBorderButton } from '../../components/ui/moving-border';
-import Animated, { 
-  useAnimatedStyle, 
-  withTiming, 
+import Animated, {
+  useAnimatedStyle,
+  withTiming,
   useSharedValue,
   withSequence,
   withDelay
@@ -329,19 +329,19 @@ export default function OrdersScreen() {
   const [representanteNome, setRepresentanteNome] = useState<string | null>(null);
 
   const menuItems: MenuItem[] = [
-    { 
+    {
       title: 'Página Inicial',
       route: '/(app)/orders',
     },
-    { 
+    {
       title: 'Clientes',
       route: '/create-order/select-client',
     },
-    { 
+    {
       title: 'Produtos',
       route: '/products',
     },
-    { 
+    {
       title: 'Sair',
       route: '/(auth)/login',
       color: '#FF3B30',
@@ -391,7 +391,7 @@ export default function OrdersScreen() {
   };
 
   const handleOrder = () => {
-    navigateTo('/(tabs)/create-order/select-client');
+    navigateTo('/(main)/create-order/select-client');
   };
 
   const handleSyncPress = () => {
@@ -420,14 +420,14 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.menuButton} 
+      <TouchableOpacity
+        style={styles.menuButton}
         onPress={() => setIsOpen(true)}
       >
         <Text style={styles.menuButtonText}>☰</Text>
       </TouchableOpacity>
 
-      <Sidebar 
+      <Sidebar
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         onNavigate={handleNavigation}
@@ -442,7 +442,7 @@ export default function OrdersScreen() {
         </View>
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcomeText}>Bem-vindo</Text>
-          <Text style={styles.userName}>Vendedor {representanteNome || ''}</Text>
+          <Text style={styles.userName}>Vendedor(a): {representanteNome || ''}</Text>
         </View>
       </View>
 
@@ -472,22 +472,22 @@ export default function OrdersScreen() {
         )}
 
         <View style={styles.brandsSection}>
-          <SectionHeader 
-            title="Marcas" 
+          <SectionHeader
+            title="Marcas"
             onViewAll={handleViewAllBrands}
           />
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
             style={styles.brandsScroll}
           >
             {brands.map((brand) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={brand.id}
                 style={styles.brandCard}
-                onPress={() => navigateTo(`/(tabs)/brands/${brand.id}` as any)}
+                onPress={() => navigateTo(`/(main)/brands/${brand.id}` as any)}
               >
-                <Image 
+                <Image
                   source={brand.image_url ? { uri: brand.image_url } : undefined}
                   style={styles.brandImage}
                 />
@@ -498,21 +498,21 @@ export default function OrdersScreen() {
         </View>
 
         <View style={styles.productsSection}>
-          <SectionHeader 
-            title="Itens Aceleradores" 
+          <SectionHeader
+            title="Itens Aceleradores"
             onViewAll={() => navigateTo('/products' as any)}
           />
           <FlatList
             data={acceleratorProducts}
             keyExtractor={(item) => item.id}
             renderItem={({ item: product }) => (
-              <TouchableOpacity 
-                key={product.id} 
+              <TouchableOpacity
+                key={product.id}
                 style={styles.productItemGrid}
                 onPress={() => navigateTo('/products' as any)}
               >
-                <Image 
-                  source={{ uri: product.image_url }} 
+                <Image
+                  source={{ uri: product.image_url }}
                   style={styles.productImage}
                 />
                 <View style={styles.productInfo}>
@@ -536,7 +536,7 @@ export default function OrdersScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* Botão Fazer Pedido flutuante */} 
+      {/* Botão Fazer Pedido flutuante */}
       <View style={styles.orderButtonContainer}>
         <MovingBorderButton
           onPress={handleOrder}

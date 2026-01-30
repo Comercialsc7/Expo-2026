@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Alert } from 'react-native';
-import { ArrowLeft } from 'lucide-react-native';
+
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useSpinResultsStore } from '../../../store/useSpinResultsStore';
@@ -82,11 +82,11 @@ export default function SpinWheelScreen() {
   const handleNoPrize = () => {
     // Add the "no prize" result to the store
     addResult({ prize: 'Não foi dessa vez', photoUri: '' });
-    
+
     // Navigate to email collection
     router.push({
-      pathname: '/(tabs)/create-order/collect-email',
-      params: { 
+      pathname: '/(main)/create-order/collect-email',
+      params: {
         subtotal: params.subtotal,
         itens: params.itens,
         desconto: params.desconto,
@@ -98,13 +98,13 @@ export default function SpinWheelScreen() {
 
   const handleConfirmGiro = () => {
     const premioSelecionado = premios[selected];
-    
+
     addResult({ prize: premioSelecionado, photoUri: capturedImage! });
 
     // Navigate to email collection on last spin or continue spinning
     router.push({
-      pathname: isLastGiro ? '/(tabs)/create-order/collect-email' : '/(tabs)/create-order/spin-wheel',
-      params: { 
+      pathname: isLastGiro ? '/(main)/create-order/collect-email' : '/(main)/create-order/spin-wheel',
+      params: {
         girosDisponiveis: isLastGiro ? girosDisponiveis : girosDisponiveis - 1,
         subtotal: params.subtotal,
         itens: params.itens,
@@ -191,7 +191,7 @@ export default function SpinWheelScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        
+
         {/* Only show photo button if a prize is selected and it's not "Não foi dessa vez" */}
         {selected !== -1 && !isNoPrize && (
           <>

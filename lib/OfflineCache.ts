@@ -138,6 +138,12 @@ class OfflineCache {
       .order('created_at', { ascending: false });
 
     if (error) {
+      // Se a tabela não existe (PGRST205), apenas avisamos e ignoramos
+      if (error.code === 'PGRST205') {
+        console.warn(`⚠️ [OfflineCache] A tabela '${table}' ainda não existe no Supabase. Pulando.`);
+        return 0;
+      }
+
       console.error(`❌ [OfflineCache] Erro ao baixar tabela '${table}':`, error);
       throw error;
     }

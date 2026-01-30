@@ -115,14 +115,18 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Ignorar requisições não HTTP/HTTPS
+  // Ignorar requisições não HTTP/HTTPS (websockets, extensions, etc)
   if (!url.protocol.startsWith('http')) {
     return;
   }
 
-  // Ignorar requisições para APIs externas (Supabase)
+  // Ignorar requisições para APIs externas (Supabase) - deixa o navegador lidar direto
   if (url.hostname.includes('supabase.co')) {
-    event.respondWith(fetch(request));
+    return;
+  }
+
+  // Ignorar requisições de hot-reload/dev-server
+  if (url.pathname.includes('hot-update') || url.pathname.includes('socket.io') || url.pathname.includes('metro')) {
     return;
   }
 
@@ -142,14 +146,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network First para páginas HTML e API calls
-  if (request.destination === 'document' || request.method === 'GET') {
+  // Network First para páginas HTML
+  if (request.destination === 'document') {
     event.respondWith(networkFirst(request));
     return;
   }
 
-  // Padrão: apenas fetch
-  event.respondWith(fetch(request));
+  // Comportamento padrão: apenas fetch sem interceptação
+  return;
 });
 
 // Background sync (se suportado)

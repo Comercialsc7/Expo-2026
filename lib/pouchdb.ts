@@ -90,6 +90,7 @@ if (!db) {
     destroy: async () => ({ ok: true }),
     createIndex: async (opts: any) => ({ result: 'created' }),
     info: async () => ({ db_name: 'mock_db', doc_count: 0 }),
+    bulkDocs: async (docs: any[]) => docs.map(d => ({ ok: true, id: d._id || 'mock_id', rev: '0-0' })),
   };
 }
 
