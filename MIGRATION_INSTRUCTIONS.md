@@ -1,7 +1,6 @@
 # 🗄️ Instruções para Aplicar Migrações no Novo Banco Supabase
 
-## ✅ Conexão Verificada
-- URL: `https://wuappvtbbjzdtgrcenwk.supabase.co`
+## ✅ Conexão VerificadaS
 - Conexão testada com sucesso!
 
 ## 📋 Passos para Aplicar as Migrações
