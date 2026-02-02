@@ -1,7 +1,7 @@
 // Nome do cache
-const CACHE_NAME = 'expo2025-cache-v3';
-const RUNTIME_CACHE = 'expo2025-runtime-v3';
-const IMAGE_CACHE = 'expo2025-images-v3';
+const CACHE_NAME = 'expo2026-cache-v3';
+const RUNTIME_CACHE = 'expo2026-runtime-v3';
+const IMAGE_CACHE = 'expo2026-images-v3';
 
 // Recursos essenciais para cache
 const urlsToCache = [

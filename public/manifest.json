@@ -1,14 +1,17 @@
 {
-  "name": "Sistema Expo2025",
-  "short_name": "Expo2025",
+  "name": "Sistema Expo2026",
+  "short_name": "Expo2026",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#003B71",
   "theme_color": "#003B71",
-  "description": "Sistema de vendas Expo2025",
-  "categories": ["business", "productivity"],
+  "description": "Sistema de vendas Expo2026",
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "lang": "pt-BR",
   "dir": "ltr",
   "icons": [
@@ -52,4 +55,4 @@
       ]
     }
   ]
-} 
+}

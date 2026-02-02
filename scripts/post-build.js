@@ -58,10 +58,10 @@ if (fs.existsSync(indexPath)) {
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Expo2025" />
-  <meta name="application-name" content="Sistema Expo2025" />
+  <meta name="apple-mobile-web-app-title" content="Expo2026" />
+  <meta name="application-name" content="Sistema Expo2026" />
   <meta name="theme-color" content="#003B71" />
-  <meta name="description" content="Sistema de vendas Expo2025" />
+  <meta name="description" content="Sistema de vendas Expo2026" />
 
   <!-- Manifest -->
   <link rel="manifest" href="/manifest.json" />
