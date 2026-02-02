@@ -1,97 +1,117 @@
+import { Platform } from 'react-native';
+
+// Declaração segura para persistência
 let db: any = null;
 
-const resolveModule = (mod: any): any => {
-  if (!mod) return null;
+const initDB = () => {
+  if (db) return db;
 
-  if (typeof mod === 'function') {
-    return mod;
-  }
+  // Web Environment (Mobile Browser or Desktop Browser)
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    try {
+      console.log('📦 [PouchDB] Inicializando banco de dados (Web/PWA)...');
 
-  if (typeof mod === 'object') {
-    if ('default' in mod) {
-      return resolveModule(mod.default);
-    }
-    if ('PouchDB' in mod) {
-      return resolveModule((mod as any).PouchDB);
-    }
-  }
+      // Imports diretos para Web garantem melhor compatibilidade com bundlers
+      const PouchDB = require('pouchdb-browser').default || require('pouchdb-browser');
+      const PouchDBFind = require('pouchdb-find').default || require('pouchdb-find');
 
-  return null;
-};
-
-const resolvePlugin = (mod: any): any => {
-  if (!mod) return null;
-
-  if (typeof mod === 'function') {
-    return mod;
-  }
-
-  if (typeof mod === 'object' && 'default' in mod) {
-    return resolvePlugin(mod.default);
-  }
-
-  return null;
-};
-
-if (typeof window !== 'undefined') {
-  try {
-    const PouchDBModule = require('pouchdb-browser');
-    const PouchDBFindModule = require('pouchdb-find');
-
-    const PouchDB = resolveModule(PouchDBModule);
-    const PouchDBFind = resolvePlugin(PouchDBFindModule);
-
-    if (PouchDB && typeof PouchDB === 'function') {
+      // Registrar plugins
       if (PouchDBFind) {
-        try {
-          PouchDB.plugin(PouchDBFind);
-        } catch (pluginError) {
-          console.warn('⚠️ Erro ao adicionar plugin PouchDB Find:', pluginError);
-        }
+        PouchDB.plugin(PouchDBFind);
       }
 
-      try {
-        db = new PouchDB('offline_db', {
-          auto_compaction: true,
-          revs_limit: 1,
-        });
+      // Inicializar banco
+      db = new PouchDB('expo2026_offline_db', {
+        auto_compaction: true,
+        revs_limit: 1,
+      });
 
-        db.createIndex({
-          index: {
-            fields: ['table'],
-          },
-        }).catch((err: any) => {
-          console.warn('⚠️ Não foi possível criar índice PouchDB:', err);
-        });
+      // Validar se o banco está realmente salvando (teste simples)
+      db.info().then((info: any) => {
+        console.log(`✅ [PouchDB] Banco '${info.db_name}' pronto! Docs: ${info.doc_count}`);
+      }).catch((err: any) => {
+        console.error('❌ [PouchDB] Falha ao obter info do banco:', err);
+      });
 
-        console.log('✅ PouchDB inicializado com sucesso');
-      } catch (initError: any) {
-        console.warn('⚠️ PouchDB não pode ser inicializado (storage bloqueado):', initError.message);
-        db = null;
-      }
-    } else {
-      throw new Error(`PouchDB não é uma função construtora. Valor recebido: ${typeof PouchDBModule}`);
+      // Garantir índices base
+      db.createIndex({
+        index: { fields: ['table'] }
+      }).then(() => {
+        console.log('✅ [PouchDB] Índice "table" verificado/criado');
+      }).catch((e: any) => {
+        console.warn('⚠️ [PouchDB] Erro ao criar índice:', e);
+      });
+
+      return db;
+
+    } catch (error: any) {
+      console.error('❌ [PouchDB] ERRO CRÍTICO NA INICIALIZAÇÃO:', error);
+      // Fallback para Mock apenas se falhar muito feio
     }
-  } catch (error) {
-    console.warn('PouchDB não pode ser carregado:', error);
-    console.warn('Usando mock do PouchDB (funcionalidade offline limitada)');
   }
-}
 
-if (!db) {
-  console.warn('PouchDB não está disponível - usando mock (operações retornam vazio, não rejeitam)');
-  // Mock que retorna resultados neutros para evitar que código de negócio que chama LocalDB quebre
-  db = {
-    put: async (doc: any) => ({ ok: true, id: doc._id || null, rev: '0-0' }),
-    get: async (id: string) => { throw new Error('Documento não encontrado (mock)'); },
-    find: async (query: any) => ({ docs: [] }),
-    remove: async (id: string, rev?: string) => ({ ok: true, id }),
-    allDocs: async (opts: any) => ({ rows: [] }),
-    destroy: async () => ({ ok: true }),
-    createIndex: async (opts: any) => ({ result: 'created' }),
-    info: async () => ({ db_name: 'mock_db', doc_count: 0 }),
-    bulkDocs: async (docs: any[]) => docs.map(d => ({ ok: true, id: d._id || 'mock_id', rev: '0-0' })),
+  // Se chegou aqui e db ainda é null (Native ou Erro), usa Mock ou tenta Adapter nativo (não configurado aqui)
+  if (!db) {
+    console.warn('⚠️ [PouchDB] Usando MOCK DB (Memória Volátil) - Dados serão perdidos ao recarregar!');
+    db = createMockDB();
+  }
+
+  return db;
+};
+
+const createMockDB = () => {
+  const store: Record<string, any> = {};
+  return {
+    put: async (doc: any) => {
+      const id = doc._id || Date.now().toString();
+      store[id] = { ...doc, _id: id, _rev: '1-mock' };
+      return { ok: true, id, rev: '1-mock' };
+    },
+    get: async (id: string) => {
+      if (store[id]) return store[id];
+      throw { status: 404, message: 'missing' };
+    },
+    find: async (query: any) => {
+      // Mock find muito simples (scan linear)
+      const docs = Object.values(store);
+      // Filtro básico de table se existir no selector
+      if (query.selector && query.selector.table) {
+        return { docs: docs.filter(d => d.table === query.selector.table) };
+      }
+      return { docs };
+    },
+    remove: async (id: string, rev?: string) => {
+      if (store[id]) {
+        delete store[id];
+        return { ok: true, id };
+      }
+      return { ok: true, id, message: 'not found but ok' };
+    },
+    allDocs: async (opts: any) => {
+      const rows = Object.values(store).map(doc => ({ doc, id: doc._id, key: doc._id }));
+      return { rows, total_rows: rows.length };
+    },
+    bulkDocs: async (docs: any[]) => {
+      return docs.map(d => {
+        if (d._deleted) {
+          delete store[d._id];
+          return { ok: true, id: d._id, rev: 'deleted' };
+        }
+        const id = d._id || Date.now().toString();
+        store[id] = { ...d, _id: id, _rev: '1-bulk' };
+        return { ok: true, id, rev: '1-bulk' };
+      });
+    },
+    destroy: async () => {
+      for (const key in store) delete store[key];
+      return { ok: true };
+    },
+    createIndex: async () => ({ result: 'mock_created' }),
+    info: async () => ({ db_name: 'mock_memory_db', doc_count: Object.keys(store).length }),
   };
-}
+};
+
+// Inicializa singleton
+db = initDB();
 
 export default db;
