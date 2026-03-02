@@ -10,6 +10,7 @@ import { styles } from './styles/_sync-orders.styles';
 import { useSyncService } from '../hooks/useSyncService';
 import LocalDB from '../lib/LocalDB';
 import { ConnectionBadge } from '../components/shared/ConnectionBadge';
+import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 
 const closeIcon = require('../assets/images/x.png');
 const backIcon = require('../assets/images/voltar.png');
@@ -248,6 +249,15 @@ export default function SyncOrdersScreen() {
       // 2) Força download completo de cada tabela crítica para garantir cache offline
       for (const table of syncTables) {
         await downloadTable(table, true);
+
+        // 3) Espelha os dados no SQLite para persistência offline robusta
+        try {
+          const localRecords = await LocalDB.getAll(table);
+          const payloads = localRecords.map((record) => record.payload);
+          await OfflineSQLiteService.replaceTable(table, payloads);
+        } catch (sqliteError) {
+          console.warn(`⚠️ Falha ao espelhar '${table}' para SQLite:`, sqliteError);
+        }
       }
 
       Alert.alert('Sucesso', 'Sincronização completa concluída!');

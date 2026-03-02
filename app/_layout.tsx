@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { InstallPWABanner } from '../components/shared/InstallPWABanner';
 import { OfflineIndicator } from '../components/shared/OfflineIndicator';
 import OfflineCache from '../lib/OfflineCache';
+import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -29,6 +30,10 @@ export default function RootLayout() {
 
   // Preparar cache automaticamente se necessário
   useEffect(() => {
+    OfflineSQLiteService.init().catch((error) => {
+      console.error('Erro ao inicializar SQLite offline:', error);
+    });
+
     async function prepareOfflineCacheIfNeeded() {
       try {
         // Só prepara se estiver online

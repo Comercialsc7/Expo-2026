@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import TableStore from '../lib/TableStore';
+import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 
 export interface Product {
   id: string;
@@ -27,6 +28,15 @@ export const useProducts = () => {
 
       // Cache-first: sempre tenta renderizar o cache antes da rede
       try {
+        const sqliteProducts = await OfflineSQLiteService.getAll('products');
+        if (sqliteProducts && sqliteProducts.length > 0) {
+          const sortedSQLiteProducts = [...sqliteProducts].sort((a: any, b: any) =>
+            String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR')
+          );
+          setProducts(sortedSQLiteProducts as Product[]);
+          hasCachedProducts = true;
+        }
+
         const cachedProducts = await TableStore.get('products');
         if (cachedProducts && cachedProducts.length > 0) {
           const sortedCachedProducts = [...cachedProducts].sort((a, b) =>
@@ -84,6 +94,7 @@ export const useProducts = () => {
       if (allProducts.length > 0) {
         try {
           await TableStore.set('products', allProducts);
+          await OfflineSQLiteService.replaceTable('products', allProducts);
         } catch (cacheError) {
           console.warn('⚠️ Falha ao atualizar cache local de produtos:', cacheError);
         }
@@ -94,6 +105,16 @@ export const useProducts = () => {
       console.warn('⚠️ Erro ao carregar produtos online. Usando cache local...', err);
 
       try {
+        const sqliteProducts = await OfflineSQLiteService.getAll('products');
+        if (sqliteProducts && sqliteProducts.length > 0) {
+          const sortedSQLiteProducts = [...sqliteProducts].sort((a: any, b: any) =>
+            String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR')
+          );
+          setProducts(sortedSQLiteProducts as Product[]);
+          setError(null);
+          return;
+        }
+
         const cachedProducts = await TableStore.get('products');
 
         if (cachedProducts && cachedProducts.length > 0) {
@@ -139,6 +160,7 @@ export const useProducts = () => {
 
       try {
         await TableStore.set('products', updatedProducts);
+        await OfflineSQLiteService.replaceTable('products', updatedProducts);
       } catch (cacheError) {
         console.warn('⚠️ Falha ao persistir atualização local de produtos:', cacheError);
       }
@@ -155,6 +177,7 @@ export const useProducts = () => {
 
       try {
         await TableStore.set('products', updatedProducts);
+        await OfflineSQLiteService.replaceTable('products', updatedProducts);
       } catch (cacheError) {
         console.warn('⚠️ Falha ao salvar alteração local offline:', cacheError);
       }

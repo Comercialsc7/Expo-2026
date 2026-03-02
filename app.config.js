@@ -22,6 +22,7 @@ const extra = {
 module.exports = () => ({
   expo: {
     ...base.expo,
+    plugins: Array.from(new Set([...(base.expo?.plugins || []), 'expo-sqlite'])),
     extra,
   },
 });
