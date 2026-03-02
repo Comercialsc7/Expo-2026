@@ -20,7 +20,7 @@ export default function SyncOrdersScreen() {
 
   const { goBack } = useNavigation();
   const { cachedOrders, clearCachedOrders, getOrderById, _hasHydrated, removeCachedOrder } = useCachedOrdersStore();
-  const { syncing, progress, total, message, error: syncError, sync, upload, download } = useSyncService();
+  const { syncing, progress, total, message, error: syncError, sync, upload, download, downloadTable } = useSyncService();
   const [isSending, setIsSending] = useState(false);
   const [isReceiving, setIsReceiving] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -242,13 +242,19 @@ export default function SyncOrdersScreen() {
 
   const handleFullSync = useCallback(async () => {
     try {
-      // Sincronização completa incluindo todos os cadastros usados no app
-      await sync(syncTables);
+      // 1) Envia pendências locais
+      await upload();
+
+      // 2) Força download completo de cada tabela crítica para garantir cache offline
+      for (const table of syncTables) {
+        await downloadTable(table, true);
+      }
+
       Alert.alert('Sucesso', 'Sincronização completa concluída!');
     } catch (error) {
       Alert.alert('Erro', 'Falha na sincronização. Tente novamente.');
     }
-  }, [sync, syncTables]);
+  }, [upload, downloadTable, syncTables]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

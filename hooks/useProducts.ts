@@ -19,9 +19,26 @@ export const useProducts = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchProducts = async () => {
+    let hasCachedProducts = false;
+
     try {
       setLoading(true);
       setError(null);
+
+      // Cache-first: sempre tenta renderizar o cache antes da rede
+      try {
+        const cachedProducts = await TableStore.get('products');
+        if (cachedProducts && cachedProducts.length > 0) {
+          const sortedCachedProducts = [...cachedProducts].sort((a, b) =>
+            String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR')
+          );
+          setProducts(sortedCachedProducts as Product[]);
+          hasCachedProducts = true;
+        }
+      } catch (cacheReadError) {
+        console.warn('⚠️ Falha ao ler produtos do cache local:', cacheReadError);
+      }
+
       // Buscar TODOS os produtos em lotes para evitar timeouts
       let allProducts: Product[] = [];
       const batchSize = 1000;
@@ -86,10 +103,16 @@ export const useProducts = () => {
           setProducts(sortedCachedProducts as Product[]);
           setError(null);
         } else {
-          setError('Sem conexão e sem produtos em cache.');
+          if (hasCachedProducts || products.length > 0) {
+            setError(null);
+          } else {
+            setError('Sem conexão e sem produtos em cache.');
+          }
         }
       } catch (cacheErr) {
-        setError('Erro ao carregar produtos (online e offline).');
+        if (!hasCachedProducts && products.length === 0) {
+          setError('Erro ao carregar produtos (online e offline).');
+        }
         console.error('Erro no fallback de produtos em cache:', cacheErr);
       }
     } finally {
