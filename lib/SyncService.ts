@@ -26,6 +26,11 @@ export class SyncService {
   private static isSyncing = false;
   private static lastSyncTime: Record<string, Date> = {};
   private static SYNC_META_TABLE = 'sync_meta';
+  private static UPLOAD_TABLES = new Set([
+    'pedidos',
+    'order_items',
+    'itens_pedido',
+  ]);
 
   static on(eventType: SyncEventType, listener: EventListener): void {
     if (!this.listeners.has(eventType)) {
@@ -211,12 +216,15 @@ export class SyncService {
       }
 
       const allTables = await LocalDB.getAllTables();
+      const configuredTables = config?.tables ? new Set(config.tables) : null;
       const records = [];
       const processedTables = new Set<string>();
 
       for (const table of allTables) {
         // Ignora a tabela de metadados
         if (table === this.SYNC_META_TABLE) continue;
+        if (!this.UPLOAD_TABLES.has(table)) continue;
+        if (configuredTables && !configuredTables.has(table)) continue;
 
         const tableRecords = await LocalDB.getAll(table);
         const unsyncedRecords = tableRecords.filter(
@@ -262,7 +270,12 @@ export class SyncService {
             throw error;
           }
 
-          await LocalDB.remove(table, record._id);
+          await LocalDB.save(table, {
+            ...record.payload,
+            _id: record._id,
+            _synced: true,
+            _lastSync: new Date().toISOString(),
+          });
 
           results.success++;
           processed++;
@@ -512,7 +525,12 @@ export class SyncService {
             throw error;
           }
 
-          await LocalDB.remove(table, record._id);
+          await LocalDB.save(table, {
+            ...record.payload,
+            _id: record._id,
+            _synced: true,
+            _lastSync: new Date().toISOString(),
+          });
           results.success++;
         } catch (error) {
           results.failed++;

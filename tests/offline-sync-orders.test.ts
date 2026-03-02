@@ -72,9 +72,9 @@ vi.mock('../lib/pouchdb', () => {
   };
 });
 
-const upsertMock = vi.fn(async () => ({ error: null }));
-const gtMock = vi.fn(async () => ({ data: [], error: null }));
-const selectMock = vi.fn(() => ({
+const upsertMock: any = vi.fn(async () => ({ error: null }));
+const gtMock: any = vi.fn(async () => ({ data: [], error: null }));
+const selectMock: any = vi.fn(() => ({
   gt: gtMock,
   then: (resolve: (value: any) => any) => resolve({ data: [], error: null }),
 }));
@@ -84,7 +84,7 @@ vi.mock('../lib/supabase', () => {
     supabase: {
       from: (table: string) => ({
         upsert: (payload: any) => upsertMock(table, payload),
-        select: () => selectMock(table),
+        select: () => selectMock(),
       }),
     },
   };
@@ -106,7 +106,7 @@ describe('Offline order queue and reconnection sync', () => {
     }));
   });
 
-  it('envia pedidos pendentes na reconexão e limpa fila local', async () => {
+  it('envia pedidos pendentes na reconexão e mantém pedido local marcado como sincronizado', async () => {
     await LocalDB.save('pedidos', {
       id: 'pedido-local-1',
       cliente_nome: 'Cliente Offline',
@@ -119,7 +119,8 @@ describe('Offline order queue and reconnection sync', () => {
 
     expect(result.success).toBe(1);
     expect(result.failed).toBe(0);
-    expect(remaining).toHaveLength(0);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].payload._synced).toBe(true);
 
     expect(upsertMock).toHaveBeenCalledTimes(1);
     expect(upsertMock).toHaveBeenCalledWith(
@@ -130,6 +131,36 @@ describe('Offline order queue and reconnection sync', () => {
         total: 150,
       })
     );
+  });
+
+  it('não envia tabelas de referência no upload e preserva cache de clientes', async () => {
+    await LocalDB.save('clients', {
+      id: 'cli-1',
+      nome: 'Cliente Referência',
+      _synced: false,
+    });
+
+    await LocalDB.save('pedidos', {
+      id: 'pedido-local-2',
+      cliente_nome: 'Cliente Referência',
+      total: 200,
+      _synced: false,
+    });
+
+    const result = await SyncService.upload();
+    const clients = await LocalDB.getAll('clients');
+
+    expect(result.success).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(upsertMock).toHaveBeenCalledTimes(1);
+    expect(upsertMock).toHaveBeenCalledWith(
+      'pedidos',
+      expect.objectContaining({
+        id: 'pedido-local-2',
+      })
+    );
+    expect(clients).toHaveLength(1);
+    expect(clients[0].payload.id).toBe('cli-1');
   });
 
   it('faz download incremental e salva novos pedidos como sincronizados', async () => {
@@ -163,7 +194,7 @@ describe('Offline order queue and reconnection sync', () => {
   });
 
   it('não trava indefinidamente quando o download fica pendurado', async () => {
-    const hangingThenable = {
+    const hangingThenable: any = {
       then: () => {
         // Promise intentionally left pending
       },
