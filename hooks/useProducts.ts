@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import TableStore from '../lib/TableStore';
 
 export interface Product {
   id: string;
@@ -20,6 +21,7 @@ export const useProducts = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
+      setError(null);
       // Buscar TODOS os produtos em lotes para evitar timeouts
       let allProducts: Product[] = [];
       const batchSize = 1000;
@@ -61,10 +63,35 @@ export const useProducts = () => {
       if (count && allProducts.length < count) {
         console.warn(`⚠️ ATENÇÃO: Esperávamos ${count} produtos, mas recebemos apenas ${allProducts.length}`);
       }
+
+      if (allProducts.length > 0) {
+        try {
+          await TableStore.set('products', allProducts);
+        } catch (cacheError) {
+          console.warn('⚠️ Falha ao atualizar cache local de produtos:', cacheError);
+        }
+      }
+
       setProducts(allProducts);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar produtos');
-      console.error('Erro no catch de fetchProducts:', err);
+      console.warn('⚠️ Erro ao carregar produtos online. Usando cache local...', err);
+
+      try {
+        const cachedProducts = await TableStore.get('products');
+
+        if (cachedProducts && cachedProducts.length > 0) {
+          const sortedCachedProducts = [...cachedProducts].sort((a, b) =>
+            String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR')
+          );
+          setProducts(sortedCachedProducts as Product[]);
+          setError(null);
+        } else {
+          setError('Sem conexão e sem produtos em cache.');
+        }
+      } catch (cacheErr) {
+        setError('Erro ao carregar produtos (online e offline).');
+        console.error('Erro no fallback de produtos em cache:', cacheErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -78,9 +105,38 @@ export const useProducts = () => {
         .eq('id', productId);
 
       if (error) throw error;
+
+      const updatedProducts = products.map((product) =>
+        product.id === productId
+          ? { ...product, is_accelerator: isAccelerator }
+          : product
+      );
+
+      setProducts(updatedProducts);
+
+      try {
+        await TableStore.set('products', updatedProducts);
+      } catch (cacheError) {
+        console.warn('⚠️ Falha ao persistir atualização local de produtos:', cacheError);
+      }
+
       await fetchProducts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar produto');
+      const updatedProducts = products.map((product) =>
+        product.id === productId
+          ? { ...product, is_accelerator: isAccelerator }
+          : product
+      );
+
+      setProducts(updatedProducts);
+
+      try {
+        await TableStore.set('products', updatedProducts);
+      } catch (cacheError) {
+        console.warn('⚠️ Falha ao salvar alteração local offline:', cacheError);
+      }
+
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar produto (alteração salva localmente).');
     }
   };
 

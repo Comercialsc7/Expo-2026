@@ -16,6 +16,8 @@ const backIcon = require('../assets/images/voltar.png');
 const lixeiraIcon = require('../assets/images/lixeira.png');
 
 export default function SyncOrdersScreen() {
+  const syncTables = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'relacao_prazo'];
+
   const { goBack } = useNavigation();
   const { cachedOrders, clearCachedOrders, getOrderById, _hasHydrated, removeCachedOrder } = useCachedOrdersStore();
   const { syncing, progress, total, message, error: syncError, sync, upload, download } = useSyncService();
@@ -230,23 +232,23 @@ export default function SyncOrdersScreen() {
 
   const handleSyncDownload = useCallback(async () => {
     try {
-      // Incluir 'teams' e 'brands' no download para garantir cadastros atualizados
-      await download(['pedidos', 'products', 'clients', 'teams', 'brands']);
+      // Download completo dos dados necessários para operação offline
+      await download(syncTables);
       Alert.alert('Sucesso', 'Dados atualizados do servidor!');
     } catch (error) {
       Alert.alert('Erro', 'Falha ao baixar dados. Tente novamente.');
     }
-  }, [download]);
+  }, [download, syncTables]);
 
   const handleFullSync = useCallback(async () => {
     try {
-      // Sincronização completa incluindo cadastros (teams, brands)
-      await sync(['pedidos', 'products', 'clients', 'teams', 'brands']);
+      // Sincronização completa incluindo todos os cadastros usados no app
+      await sync(syncTables);
       Alert.alert('Sucesso', 'Sincronização completa concluída!');
     } catch (error) {
       Alert.alert('Erro', 'Falha na sincronização. Tente novamente.');
     }
-  }, [sync]);
+  }, [sync, syncTables]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

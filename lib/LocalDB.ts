@@ -212,7 +212,37 @@ export class LocalDB {
 
   static async bulkSave(records: any[]): Promise<number> {
     try {
-      const result = await db.bulkDocs(records);
+      const timestamp = new Date().toISOString();
+
+      const docsToSave = records.map((record) => {
+        const isLocalRecord =
+          record &&
+          typeof record === 'object' &&
+          'table' in record &&
+          'payload' in record;
+
+        if (isLocalRecord) {
+          return {
+            ...record,
+            _id: record._id || this.generateId(),
+            createdAt: record.createdAt || timestamp,
+            updatedAt: timestamp,
+          };
+        }
+
+        const id = record?._id || this.generateId();
+        const table = record?.table;
+
+        return {
+          _id: id,
+          table,
+          payload: record,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+      });
+
+      const result = await db.bulkDocs(docsToSave);
       const successCount = result.filter((r: any) => !r.error).length;
       return successCount;
     } catch (error) {

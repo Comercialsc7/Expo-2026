@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useOrderStore, Client, ClientPaymentTerm, PaymentTerm } from '../../../store/useOrderStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import TableStore from '../../../lib/TableStore';
 
 export default function SelectClient() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +42,63 @@ export default function SelectClient() {
     }
   }, [codigoEquipeFiltro, codigoRepresentanteFiltro]);
 
+  const getPaymentTermsWithFallback = async (clientCode: string): Promise<PaymentTerm[]> => {
+    try {
+      const { data: relacaoPrazo, error: errorRelacao } = await supabase
+        .from('relacao_prazo')
+        .select('diamax')
+        .eq('codcli', clientCode);
+
+      if (errorRelacao) throw errorRelacao;
+
+      const diamax = relacaoPrazo && relacaoPrazo.length > 0
+        ? Math.max(...relacaoPrazo.map((r: any) => Number(r.diamax)))
+        : null;
+
+      if (diamax === undefined || diamax === null) {
+        return [];
+      }
+
+      const { data: prazos, error: errorPrazos } = await supabase
+        .from('prazos')
+        .select('id, prazo, dias')
+        .lte('dias', diamax);
+
+      if (errorPrazos) throw errorPrazos;
+
+      return (prazos || []).map((prazo: any) => ({
+        id: prazo.id,
+        description: prazo.prazo,
+        prazo_dias: prazo.dias,
+      }));
+    } catch (error) {
+      console.warn('⚠️ Falha ao buscar prazos online. Usando cache local...', error);
+
+      const relacaoPrazoLocal = await TableStore.get('relacao_prazo');
+      const prazosLocal = await TableStore.get('prazos');
+
+      const relacoesCliente = relacaoPrazoLocal.filter(
+        (item: any) => String(item.codcli) === String(clientCode)
+      );
+
+      const diamax = relacoesCliente.length > 0
+        ? Math.max(...relacoesCliente.map((r: any) => Number(r.diamax)))
+        : null;
+
+      if (diamax === undefined || diamax === null) {
+        return [];
+      }
+
+      return prazosLocal
+        .filter((prazo: any) => Number(prazo.dias) <= diamax)
+        .map((prazo: any) => ({
+          id: prazo.id,
+          description: prazo.prazo,
+          prazo_dias: prazo.dias,
+        }));
+    }
+  };
+
   const fetchClients = async () => {
     if (codigoEquipeFiltro === null || codigoRepresentanteFiltro === null) {
       setLoading(false);
@@ -64,9 +122,24 @@ export default function SelectClient() {
 
       if (error) throw error;
 
-      setClients(data as Client[] || []);
+      const fetchedClients = (data as Client[] || []);
+      setClients(fetchedClients);
     } catch (error) {
-      console.error('Erro ao buscar clientes:', error);
+      console.warn('⚠️ Falha ao buscar clientes online. Usando cache local...', error);
+
+      try {
+        const cachedClients = await TableStore.get('clients');
+        const filteredCachedClients = cachedClients.filter(
+          (client: any) =>
+            Number(client.equipe) === Number(codigoEquipeFiltro) &&
+            String(client.repre) === String(codigoRepresentanteFiltro)
+        );
+
+        setClients(filteredCachedClients as Client[]);
+      } catch (cacheError) {
+        console.error('Erro ao buscar clientes no cache local:', cacheError);
+        setClients([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -80,33 +153,9 @@ export default function SelectClient() {
 
   const handleSelectClient = async (client: Client) => {
     try {
-      // 1. Buscar o diamax na tabela relacao_prazo
-      const { data: relacaoPrazo, error: errorRelacao } = await supabase
-        .from('relacao_prazo')
-        .select('diamax')
-        .eq('codcli', client.code);
+      const payment_terms = await getPaymentTermsWithFallback(client.code);
 
-      if (errorRelacao) throw errorRelacao;
-      const diamax = relacaoPrazo && relacaoPrazo.length > 0
-        ? Math.max(...relacaoPrazo.map((r: any) => Number(r.diamax)))
-        : null;
-
-      // 2. Buscar os prazos permitidos na tabela prazos
-      let payment_terms: PaymentTerm[] = [];
-      if (diamax !== undefined && diamax !== null) {
-        const { data: prazos, error: errorPrazos } = await supabase
-          .from('prazos')
-          .select('id, prazo, dias')
-          .lte('dias', diamax);
-        if (errorPrazos) throw errorPrazos;
-        payment_terms = (prazos || []).map((prazo: any) => ({
-          id: prazo.id,
-          description: prazo.prazo,
-          prazo_dias: prazo.dias,
-        }));
-      }
-
-      // 3. Passar o cliente com os prazos permitidos para o store
+      // Passar o cliente com os prazos permitidos para o store
       setClient({ ...client, payment_terms: payment_terms as any });
       router.push('/create-order/payment-method');
     } catch (error) {

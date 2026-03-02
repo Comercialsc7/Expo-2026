@@ -13,7 +13,7 @@
    ```
 
 2. **Aplique a migração principal:**
-   - Abra o arquivo: `supabase/migrations/20250120_complete_schema.sql`
+   - Abra o arquivo: `supabase/migrations/20251118201515_create_initial_schema.sql`
    - Copie TODO o conteúdo
    - Cole no SQL Editor do Supabase
    - Clique em "Run" (ou pressione Ctrl+Enter)
