@@ -15,6 +15,7 @@ export interface SyncEvent {
 export interface SyncConfig {
   tables: string[];
   batchSize?: number;
+  downloadTimeoutMs?: number;
   onProgress?: (event: SyncEvent) => void;
 }
 
@@ -48,6 +49,88 @@ export class SyncService {
     if (listeners) {
       listeners.forEach((listener) => listener(event));
     }
+  }
+
+  private static withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Timeout ao sincronizar '${label}' após ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      Promise.resolve(promise)
+        .then(resolve)
+        .catch(reject)
+        .finally(() => clearTimeout(timer));
+    });
+  }
+
+  private static isMissingColumnError(error: any, columnName: string): boolean {
+    const text = [
+      error?.message,
+      error?.details,
+      error?.hint,
+      error?.code,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return text.includes(columnName.toLowerCase()) &&
+      (text.includes('column') || text.includes('does not exist') || text.includes('42703') || text.includes('schema cache'));
+  }
+
+  private static async runDownloadQuery(
+    table: string,
+    lastDownloadAt: string | null,
+    timeoutMs: number
+  ): Promise<{
+    data: any[] | null;
+    error: any;
+    filterColumn: 'updated_at' | 'created_at' | null;
+  }> {
+    if (!lastDownloadAt) {
+      console.log(`🔄 [SyncService] Download completo de '${table}' (primeira vez)`);
+      const result = await this.withTimeout(
+        supabase.from(table).select('*') as unknown as Promise<{ data: any[]; error: any }>,
+        timeoutMs,
+        table
+      );
+
+      return {
+        data: result.data,
+        error: result.error,
+        filterColumn: null,
+      };
+    }
+
+    console.log(`🔄 [SyncService] Download incremental de '${table}' por 'updated_at' (desde ${lastDownloadAt})`);
+    let result = await this.withTimeout(
+      supabase.from(table).select('*').gt('updated_at', lastDownloadAt) as unknown as Promise<{ data: any[]; error: any }>,
+      timeoutMs,
+      table
+    );
+
+    if (result.error && this.isMissingColumnError(result.error, 'updated_at')) {
+      console.warn(`⚠️ [SyncService] '${table}' sem coluna updated_at. Tentando incremental por 'created_at'...`);
+
+      result = await this.withTimeout(
+        supabase.from(table).select('*').gt('created_at', lastDownloadAt) as unknown as Promise<{ data: any[]; error: any }>,
+        timeoutMs,
+        table
+      );
+
+      return {
+        data: result.data,
+        error: result.error,
+        filterColumn: 'created_at',
+      };
+    }
+
+    return {
+      data: result.data,
+      error: result.error,
+      filterColumn: 'updated_at',
+    };
   }
 
   /**
@@ -109,7 +192,7 @@ export class SyncService {
     }
   }
 
-  static async upload(config?: Partial<SyncConfig>): Promise<{
+  static async upload(config?: Partial<SyncConfig>, emitLifecycle: boolean = true): Promise<{
     success: number;
     failed: number;
     errors: Array<{ table: string; error: Error }>;
@@ -123,7 +206,9 @@ export class SyncService {
     const uploadTimestamp = new Date().toISOString();
 
     try {
-      this.emit({ type: 'sync-start', message: 'Iniciando upload...' });
+      if (emitLifecycle) {
+        this.emit({ type: 'sync-start', message: 'Iniciando upload...' });
+      }
 
       const allTables = await LocalDB.getAllTables();
       const records = [];
@@ -141,12 +226,19 @@ export class SyncService {
       }
 
       if (records.length === 0) {
-        this.emit({
-          type: 'sync-progress',
-          message: 'Nenhum registro para sincronizar',
-          progress: 0,
-          total: 0,
-        });
+        if (emitLifecycle) {
+          this.emit({
+            type: 'sync-progress',
+            message: 'Nenhum registro para sincronizar',
+            progress: 0,
+            total: 0,
+          });
+          this.emit({
+            type: 'sync-completed',
+            message: 'Upload concluído (sem pendências)',
+            data: results,
+          });
+        }
         return results;
       }
 
@@ -176,12 +268,14 @@ export class SyncService {
           processed++;
           processedTables.add(table);
 
-          this.emit({
-            type: 'sync-progress',
-            message: `Sincronizando ${processed}/${total}`,
-            progress: processed,
-            total,
-          });
+          if (emitLifecycle) {
+            this.emit({
+              type: 'sync-progress',
+              message: `Sincronizando ${processed}/${total}`,
+              progress: processed,
+              total,
+            });
+          }
         } catch (error) {
           results.failed++;
           results.errors.push({
@@ -199,18 +293,28 @@ export class SyncService {
         });
       }
 
+      if (emitLifecycle) {
+        this.emit({
+          type: 'sync-completed',
+          message: results.failed > 0 ? 'Upload concluído com erros' : 'Upload concluído com sucesso',
+          data: results,
+        });
+      }
+
       return results;
     } catch (error) {
-      this.emit({
-        type: 'sync-error',
-        message: 'Erro durante upload',
-        error: error as Error,
-      });
+      if (emitLifecycle) {
+        this.emit({
+          type: 'sync-error',
+          message: 'Erro durante upload',
+          error: error as Error,
+        });
+      }
       throw error;
     }
   }
 
-  static async download(config: SyncConfig): Promise<{
+  static async download(config: SyncConfig, emitLifecycle: boolean = true): Promise<{
     downloaded: Record<string, number>;
     errors: Array<{ table: string; error: Error }>;
   }> {
@@ -222,9 +326,12 @@ export class SyncService {
     const downloadTimestamp = new Date().toISOString();
 
     try {
-      this.emit({ type: 'sync-start', message: 'Iniciando download...' });
+      if (emitLifecycle) {
+        this.emit({ type: 'sync-start', message: 'Iniciando download...' });
+      }
 
       const { tables } = config;
+      const timeoutMs = config.downloadTimeoutMs ?? 15000;
       const total = tables.length;
       let processed = 0;
 
@@ -232,20 +339,18 @@ export class SyncService {
         try {
           // Busca o último download desta tabela
           const syncMeta = await this.getSyncMeta(table);
-          let query = supabase.from(table).select('*');
-
-          // Sincronização incremental: busca apenas dados novos
-          if (syncMeta.last_download_at) {
-            console.log(`🔄 [SyncService] Download incremental de '${table}' (desde ${syncMeta.last_download_at})`);
-            query = query.gt('updated_at', syncMeta.last_download_at);
-          } else {
-            console.log(`🔄 [SyncService] Download completo de '${table}' (primeira vez)`);
-          }
-
-          const { data, error } = await query;
+          const { data, error, filterColumn } = await this.runDownloadQuery(
+            table,
+            syncMeta.last_download_at,
+            timeoutMs
+          );
 
           if (error) {
             throw error;
+          }
+
+          if (filterColumn === 'created_at') {
+            console.log(`ℹ️ [SyncService] Incremental de '${table}' executado por 'created_at'`);
           }
 
           if (data && data.length > 0) {
@@ -276,12 +381,14 @@ export class SyncService {
 
           processed++;
 
-          this.emit({
-            type: 'sync-progress',
-            message: `Baixando ${table} (${processed}/${total})`,
-            progress: processed,
-            total,
-          });
+          if (emitLifecycle) {
+            this.emit({
+              type: 'sync-progress',
+              message: `Baixando ${table} (${processed}/${total})`,
+              progress: processed,
+              total,
+            });
+          }
         } catch (error) {
           results.errors.push({
             table,
@@ -291,13 +398,23 @@ export class SyncService {
         }
       }
 
+      if (emitLifecycle) {
+        this.emit({
+          type: 'sync-completed',
+          message: results.errors.length > 0 ? 'Download concluído com erros' : 'Download concluído com sucesso',
+          data: results,
+        });
+      }
+
       return results;
     } catch (error) {
-      this.emit({
-        type: 'sync-error',
-        message: 'Erro durante download',
-        error: error as Error,
-      });
+      if (emitLifecycle) {
+        this.emit({
+          type: 'sync-error',
+          message: 'Erro durante download',
+          error: error as Error,
+        });
+      }
       throw error;
     }
   }
@@ -322,9 +439,9 @@ export class SyncService {
     try {
       this.emit({ type: 'sync-start', message: 'Iniciando sincronização completa...' });
 
-      const uploadResults = await this.upload(config);
+      const uploadResults = await this.upload(config, false);
 
-      const downloadResults = await this.download(config);
+      const downloadResults = await this.download(config, false);
 
       const hasErrors =
         uploadResults.failed > 0 ||
@@ -409,24 +526,22 @@ export class SyncService {
     }
   }
 
-  static async downloadTable(table: string, fullRefresh = false): Promise<number> {
+  static async downloadTable(table: string, fullRefresh = false, timeoutMs: number = 15000): Promise<number> {
     try {
       const downloadTimestamp = new Date().toISOString();
       const syncMeta = fullRefresh ? null : await this.getSyncMeta(table);
-      let query = supabase.from(table).select('*');
-
-      // Sincronização incremental
-      if (syncMeta && syncMeta.last_download_at && !fullRefresh) {
-        console.log(`🔄 [SyncService] Download incremental de '${table}' (desde ${syncMeta.last_download_at})`);
-        query = query.gt('updated_at', syncMeta.last_download_at);
-      } else {
-        console.log(`🔄 [SyncService] Download completo de '${table}'`);
-      }
-
-      const { data, error } = await query;
+      const { data, error, filterColumn } = await this.runDownloadQuery(
+        table,
+        fullRefresh ? null : (syncMeta?.last_download_at || null),
+        timeoutMs
+      );
 
       if (error) {
         throw error;
+      }
+
+      if (filterColumn === 'created_at') {
+        console.log(`ℹ️ [SyncService] Incremental de '${table}' executado por 'created_at'`);
       }
 
       if (data && data.length > 0) {

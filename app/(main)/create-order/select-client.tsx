@@ -6,6 +6,22 @@ import { useOrderStore, Client, ClientPaymentTerm, PaymentTerm } from '../../../
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../../lib/TableStore';
 
+const mergeByKey = (existing: any[], incoming: any[], key: string) => {
+  const map = new Map<string, any>();
+
+  for (const item of existing || []) {
+    const k = String(item?.[key] ?? item?.id ?? '');
+    if (k) map.set(k, item);
+  }
+
+  for (const item of incoming || []) {
+    const k = String(item?.[key] ?? item?.id ?? '');
+    if (k) map.set(k, item);
+  }
+
+  return Array.from(map.values());
+};
+
 export default function SelectClient() {
   const [searchQuery, setSearchQuery] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
@@ -46,10 +62,20 @@ export default function SelectClient() {
     try {
       const { data: relacaoPrazo, error: errorRelacao } = await supabase
         .from('relacao_prazo')
-        .select('diamax')
+        .select('id, codcli, diamax')
         .eq('codcli', clientCode);
 
       if (errorRelacao) throw errorRelacao;
+
+      if (relacaoPrazo && relacaoPrazo.length > 0) {
+        try {
+          const existingRelacaoPrazo = await TableStore.get('relacao_prazo');
+          const mergedRelacaoPrazo = mergeByKey(existingRelacaoPrazo, relacaoPrazo, 'id');
+          await TableStore.set('relacao_prazo', mergedRelacaoPrazo);
+        } catch (cacheError) {
+          console.warn('⚠️ Falha ao persistir relacao_prazo no cache local:', cacheError);
+        }
+      }
 
       const diamax = relacaoPrazo && relacaoPrazo.length > 0
         ? Math.max(...relacaoPrazo.map((r: any) => Number(r.diamax)))
@@ -65,6 +91,16 @@ export default function SelectClient() {
         .lte('dias', diamax);
 
       if (errorPrazos) throw errorPrazos;
+
+      if (prazos && prazos.length > 0) {
+        try {
+          const existingPrazos = await TableStore.get('prazos');
+          const mergedPrazos = mergeByKey(existingPrazos, prazos, 'id');
+          await TableStore.set('prazos', mergedPrazos);
+        } catch (cacheError) {
+          console.warn('⚠️ Falha ao persistir prazos no cache local:', cacheError);
+        }
+      }
 
       return (prazos || []).map((prazo: any) => ({
         id: prazo.id,
@@ -124,6 +160,16 @@ export default function SelectClient() {
 
       const fetchedClients = (data as Client[] || []);
       setClients(fetchedClients);
+
+      if (fetchedClients.length > 0) {
+        try {
+          const existingClients = await TableStore.get('clients');
+          const mergedClients = mergeByKey(existingClients, fetchedClients, 'code');
+          await TableStore.set('clients', mergedClients);
+        } catch (cacheError) {
+          console.warn('⚠️ Falha ao persistir clientes no cache local:', cacheError);
+        }
+      }
     } catch (error) {
       console.warn('⚠️ Falha ao buscar clientes online. Usando cache local...', error);
 

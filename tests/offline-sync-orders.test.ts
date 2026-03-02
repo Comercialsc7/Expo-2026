@@ -161,4 +161,64 @@ describe('Offline order queue and reconnection sync', () => {
     expect(localOrders[0].payload._synced).toBe(true);
     expect(meta.last_download_at).not.toBeNull();
   });
+
+  it('não trava indefinidamente quando o download fica pendurado', async () => {
+    const hangingThenable = {
+      then: () => {
+        // Promise intentionally left pending
+      },
+    };
+
+    selectMock.mockImplementation(() => ({
+      gt: () => hangingThenable,
+      then: () => {
+        // Promise intentionally left pending
+      },
+    }));
+
+    const result = await SyncService.download({
+      tables: ['pedidos'],
+      downloadTimeoutMs: 20,
+    });
+
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].table).toBe('pedidos');
+    expect(result.errors[0].error.message).toContain('Timeout');
+  });
+
+  it('faz fallback para created_at quando updated_at não existe', async () => {
+    await LocalDB.save('sync_meta', {
+      table: 'pedidos',
+      last_download_at: '2026-03-01T10:00:00.000Z',
+      last_upload_at: null,
+    });
+
+    gtMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          message: "column pedidos.updated_at does not exist",
+          code: '42703',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 'pedido-created-at-1',
+            cliente_nome: 'Cliente CreatedAt',
+            created_at: '2026-03-02T10:00:00.000Z',
+          },
+        ],
+        error: null,
+      });
+
+    const downloaded = await SyncService.downloadTable('pedidos');
+    const localOrders = await LocalDB.getAll('pedidos');
+
+    expect(downloaded).toBe(1);
+    expect(gtMock).toHaveBeenCalledWith('updated_at', '2026-03-01T10:00:00.000Z');
+    expect(gtMock).toHaveBeenCalledWith('created_at', '2026-03-01T10:00:00.000Z');
+    expect(localOrders).toHaveLength(1);
+    expect(localOrders[0].payload.id).toBe('pedido-created-at-1');
+  });
 });
