@@ -39,6 +39,8 @@
     "lucide-react-native": "^0.513.0",
     "nanoid": "3.3.4",
     "nativewind": "^4.1.23",
+    "pouchdb-browser": "^9.0.0",
+    "pouchdb-find": "^9.0.0",
     "prop-types": "^15.8.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -52,6 +54,7 @@
     "react-native-svg": "15.11.2",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.20.0",
+    "text-encoding": "^0.7.0",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

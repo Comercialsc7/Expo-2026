@@ -25,14 +25,6 @@ if (fs.existsSync(swSource)) {
   console.log('✓ service-worker.js copiado para dist/');
 }
 
-// Copiar _headers (Netlify)
-const headersSource = path.join(publicPath, '_headers');
-const headersDest = path.join(distPath, '_headers');
-if (fs.existsSync(headersSource)) {
-  fs.copyFileSync(headersSource, headersDest);
-  console.log('✓ _headers copiado para dist/');
-}
-
 // Copiar offline.html
 const offlineSource = path.join(publicPath, 'offline.html');
 const offlineDest = path.join(distPath, 'offline.html');

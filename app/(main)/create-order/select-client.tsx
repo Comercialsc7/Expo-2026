@@ -152,30 +152,6 @@ export default function SelectClient() {
       return;
     }
 
-    const readCachedClients = async (): Promise<Client[]> => {
-      const sqliteClients = await OfflineSQLiteService.getAll('clients');
-      const cachedClients = sqliteClients.length > 0
-        ? sqliteClients
-        : await TableStore.get('clients');
-
-      const filteredCachedClients = cachedClients.filter(
-        (client: any) =>
-          Number(client.equipe) === Number(codigoEquipeFiltro) &&
-          String(client.repre) === String(codigoRepresentanteFiltro)
-      );
-
-      return filteredCachedClients as Client[];
-    };
-
-    try {
-      const cached = await readCachedClients();
-      if (cached.length > 0) {
-        setClients(cached);
-      }
-    } catch (cacheError) {
-      console.warn('⚠️ Falha ao carregar clientes do cache antes da rede:', cacheError);
-    }
-
     try {
       const { data, error } = await supabase
         .from('clients')
@@ -224,6 +200,7 @@ export default function SelectClient() {
         setClients(filteredCachedClients as Client[]);
       } catch (cacheError) {
         console.error('Erro ao buscar clientes no cache local:', cacheError);
+        setClients([]);
       }
     } finally {
       setLoading(false);

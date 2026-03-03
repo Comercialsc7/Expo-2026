@@ -12,4 +12,5 @@ if (Platform.OS === 'web' && typeof window !== 'undefined') {
     };
 }
 
+import 'text-encoding';
 import 'expo-router/entry';

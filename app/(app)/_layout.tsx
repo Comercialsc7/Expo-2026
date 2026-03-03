@@ -1,3 +1,5 @@
+import 'text-encoding';
+
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { Stack, useRouter } from 'expo-router';

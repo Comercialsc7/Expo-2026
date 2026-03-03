@@ -16,7 +16,6 @@ import { supabase } from '../../lib/supabase';
 import SectionHeader from '../../components/shared/SectionHeader';
 import { useProducts } from '../../hooks/useProducts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import OfflineSQLiteService from '../../lib/OfflineSQLiteService';
 
 interface Brand {
   id: string;
@@ -404,29 +403,14 @@ export default function OrdersScreen() {
   }, []);
 
   const fetchBrands = async () => {
-    try {
-      const cachedBrands = await OfflineSQLiteService.getAll<Brand>('brands');
-      if (cachedBrands.length > 0) {
-        setBrands(cachedBrands);
-      }
-    } catch (cacheError) {
-      console.warn('⚠️ Falha ao ler marcas do cache local:', cacheError);
-    }
+    const { data, error } = await supabase
+      .from('brands')
+      .select('id, name, image_url');
 
-    try {
-      const { data, error } = await supabase
-        .from('brands')
-        .select('id, name, image_url');
-
-      if (error) {
-        throw error;
-      }
-
-      const fetched = (data as Brand[]) || [];
-      setBrands(fetched);
-      await OfflineSQLiteService.replaceTable('brands', fetched);
-    } catch (error) {
+    if (error) {
       console.error('Erro ao buscar marcas:', error);
+    } else {
+      setBrands((data as Brand[]) || []);
     }
   };
 

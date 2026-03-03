@@ -1,5 +1,0 @@
-/service-worker.js
-  Cache-Control: no-cache
-
-/manifest.json
-  Cache-Control: public, max-age=3600

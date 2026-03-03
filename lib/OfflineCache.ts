@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import Constants from 'expo-constants';
 import TableStore from './TableStore';
-import OfflineSQLiteService from './OfflineSQLiteService';
 
 /**
  * OfflineCache - Sistema de pré-cache para funcionar offline
@@ -155,11 +154,8 @@ class OfflineCache {
       }
 
       await TableStore.set(table, data);
-      await OfflineSQLiteService.replaceTable(table, data);
       return data.length;
     }
-
-    await OfflineSQLiteService.replaceTable(table, []);
 
     return 0;
   }
@@ -212,29 +208,9 @@ class OfflineCache {
 
       const hasSession = !!sessionJson;
       const tables = tablesJson ? JSON.parse(tablesJson) : [];
-      const tablesToRequireData = new Set(
-        tables.filter((table: string) => table !== 'pedidos')
-      );
-
-      let tablesWithData = 0;
-      for (const table of tablesToRequireData) {
-        try {
-          const sqliteRows = await OfflineSQLiteService.getAll(table);
-          const tableStoreRows = sqliteRows.length > 0 ? [] : await TableStore.get(table);
-
-          if ((sqliteRows?.length || 0) > 0 || (tableStoreRows?.length || 0) > 0) {
-            tablesWithData++;
-          }
-        } catch (error) {
-          console.warn(`[OfflineCache] Falha ao validar cache da tabela '${table}':`, error);
-        }
-      }
-
-      const cacheDataReady =
-        tablesToRequireData.size === 0 || tablesWithData >= tablesToRequireData.size;
 
       return {
-        ready: hasSession && tables.length > 0 && cacheDataReady,
+        ready: hasSession && tables.length > 0,
         session: hasSession,
         tablesCount: tables.length,
         cachedAt,
