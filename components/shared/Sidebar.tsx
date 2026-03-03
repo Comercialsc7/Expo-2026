@@ -33,6 +33,14 @@ export function Sidebar({
 }: SidebarProps) {
   const translateX = useSharedValue(-width);
 
+  const blurActiveElementOnWeb = () => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const active = document.activeElement as HTMLElement | null;
+    if (active && typeof active.blur === 'function') {
+      active.blur();
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       translateX.value = withSpring(0, {
@@ -61,7 +69,13 @@ export function Sidebar({
   const sairItem = menuItems.find(item => item.title === 'Sair');
 
   const handleNavigation = (route: string) => {
+    blurActiveElementOnWeb();
     onNavigate(route);
+    onClose();
+  };
+
+  const handleClose = () => {
+    blurActiveElementOnWeb();
     onClose();
   };
 
@@ -69,11 +83,11 @@ export function Sidebar({
     <>
       <Animated.View 
         style={[styles.overlay, overlayStyle]} 
-        onTouchEnd={onClose}
+        onTouchEnd={handleClose}
       />
       <Animated.View style={[styles.sidebar, sidebarStyle, { width }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>

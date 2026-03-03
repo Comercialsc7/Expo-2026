@@ -31,10 +31,19 @@ export default function SyncOrdersScreen() {
   const [sentOrders, setSentOrders] = useState<string[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
 
+  const blurActiveElementOnWeb = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    const active = document.activeElement as HTMLElement | null;
+    if (active && typeof active.blur === 'function') {
+      active.blur();
+    }
+  }, []);
+
   const setSelectedOrder = useCallback((order: CachedOrder | null) => {
+    blurActiveElementOnWeb();
     console.log('setSelectedOrder chamado com:', order?.id);
     _setSelectedOrder(order);
-  }, []);
+  }, [blurActiveElementOnWeb]);
 
   useEffect(() => {
     async function countPending() {
@@ -184,26 +193,29 @@ export default function SyncOrdersScreen() {
   }, [cachedOrders, clearCachedOrders, sentOrders]);
 
   const handleDeleteOrder = useCallback((orderId: string) => {
+    blurActiveElementOnWeb();
     console.log('handleDeleteOrder chamado para o pedido:', orderId);
     setOrderIdToDelete(orderId);
     setIsDeleteConfirmModalVisible(true);
-  }, []);
+  }, [blurActiveElementOnWeb]);
 
   const confirmDeleteOrder = useCallback(() => {
     if (orderIdToDelete) {
+      blurActiveElementOnWeb();
       console.log('Confirmando exclusão do pedido:', orderIdToDelete);
       removeCachedOrder(orderIdToDelete);
       setSelectedOrder(null); // Fecha o modal de detalhes após a exclusão
       setIsDeleteConfirmModalVisible(false); // Fecha o modal de confirmação
       Alert.alert('Sucesso', 'Pedido removido do cache.');
     }
-  }, [orderIdToDelete, removeCachedOrder, setSelectedOrder]);
+  }, [orderIdToDelete, removeCachedOrder, setSelectedOrder, blurActiveElementOnWeb]);
 
   const cancelDeleteOrder = useCallback(() => {
+    blurActiveElementOnWeb();
     console.log('Exclusão cancelada.');
     setOrderIdToDelete(null);
     setIsDeleteConfirmModalVisible(false);
-  }, []);
+  }, [blurActiveElementOnWeb]);
 
   const handleReceiveData = useCallback(async () => {
     try {
@@ -235,6 +247,18 @@ export default function SyncOrdersScreen() {
     try {
       // Download completo dos dados necessários para operação offline
       await download(syncTables);
+
+      // Espelha também em SQLite para telas sqlite-first
+      for (const table of syncTables) {
+        try {
+          const localRecords = await LocalDB.getAll(table);
+          const payloads = localRecords.map((record) => record.payload);
+          await OfflineSQLiteService.replaceTable(table, payloads);
+        } catch (sqliteError) {
+          console.warn(`⚠️ Falha ao espelhar '${table}' para SQLite após download:`, sqliteError);
+        }
+      }
+
       Alert.alert('Sucesso', 'Dados atualizados do servidor!');
     } catch (error) {
       Alert.alert('Erro', 'Falha ao baixar dados. Tente novamente.');
