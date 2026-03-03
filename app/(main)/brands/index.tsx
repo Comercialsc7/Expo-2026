@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Image, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
+import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
 
 interface Brand {
   id: string;
@@ -21,13 +22,21 @@ export default function BrandsScreen() {
 
   const fetchBrands = async () => {
     try {
+      const cachedBrands = await OfflineSQLiteService.getAll<Brand>('brands');
+      if (cachedBrands.length > 0) {
+        setBrands(cachedBrands);
+      }
+
       const { data, error } = await supabase
         .from('brands')
         .select('*')
         .order('name');
 
       if (error) throw error;
-      setBrands(data || []);
+
+      const fetchedBrands = (data || []) as Brand[];
+      setBrands(fetchedBrands);
+      await OfflineSQLiteService.replaceTable('brands', fetchedBrands);
     } catch (error) {
       console.error('Erro ao buscar marcas:', error);
     } finally {

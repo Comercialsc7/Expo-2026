@@ -25,10 +25,14 @@ export function OfflinePrepareButton() {
           text: 'Preparar',
           onPress: async () => {
             const result = await prepare([
+              'teams',
               'products',
               'clients',
               'brands',
-              'categories',
+              'users',
+              'prazos',
+              'relacao_prazo',
+              'pedidos',
             ]);
 
             if (result.success) {

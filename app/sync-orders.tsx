@@ -235,6 +235,18 @@ export default function SyncOrdersScreen() {
     try {
       // Download completo dos dados necessários para operação offline
       await download(syncTables);
+
+      // Espelha os dados em SQLite para telas que usam cache sqlite-first
+      for (const table of syncTables) {
+        try {
+          const localRecords = await LocalDB.getAll(table);
+          const payloads = localRecords.map((record) => record.payload);
+          await OfflineSQLiteService.replaceTable(table, payloads);
+        } catch (sqliteError) {
+          console.warn(`⚠️ Falha ao espelhar '${table}' para SQLite após download:`, sqliteError);
+        }
+      }
+
       Alert.alert('Sucesso', 'Dados atualizados do servidor!');
     } catch (error) {
       Alert.alert('Erro', 'Falha ao baixar dados. Tente novamente.');

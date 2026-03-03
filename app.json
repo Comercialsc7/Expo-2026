@@ -15,6 +15,9 @@
     "ios": {
       "supportsTablet": true
     },
+    "android": {
+      "package": "com.comercialsc7.expo2026"
+    },
     "web": {
       "bundler": "metro",
       "output": "single",

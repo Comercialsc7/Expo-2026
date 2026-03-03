@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import SyncService from '../lib/SyncService';
+import LocalDB from '../lib/LocalDB';
+import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 
 const OFFLINE_SYNC_TABLES = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'relacao_prazo'];
 
@@ -23,6 +25,18 @@ export function useOnlineStatus() {
           // Primeiro envia pendências locais e depois baixa atualizações do servidor
           await SyncService.upload();
           await SyncService.download({ tables: OFFLINE_SYNC_TABLES });
+
+          // Espelha tabelas críticas em SQLite para telas sqlite-first
+          for (const table of OFFLINE_SYNC_TABLES) {
+            try {
+              const localRecords = await LocalDB.getAll(table);
+              const payloads = localRecords.map((record) => record.payload);
+              await OfflineSQLiteService.replaceTable(table, payloads);
+            } catch (sqliteError) {
+              console.warn(`⚠️ Falha ao espelhar '${table}' no SQLite após auto-sync:`, sqliteError);
+            }
+          }
+
           console.log('✅ Auto-sync concluído com sucesso');
         } catch (error) {
           console.error('❌ Erro no auto-sync:', error);

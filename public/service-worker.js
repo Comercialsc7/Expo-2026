@@ -1,170 +1,119 @@
-// Nome do cache
-const CACHE_NAME = 'expo2026-cache-v3';
-const RUNTIME_CACHE = 'expo2026-runtime-v3';
-const IMAGE_CACHE = 'expo2026-images-v3';
+const SW_VERSION = 'v4';
+const STATIC_CACHE = `expo2026-static-${SW_VERSION}`;
+const RUNTIME_CACHE = `expo2026-runtime-${SW_VERSION}`;
 
-// Recursos essenciais para cache
-const urlsToCache = [
+const PRECACHE_URLS = [
   '/',
   '/index.html',
-  '/manifest.json',
-  '/assets/images/icon.png',
-  '/favicon.ico',
   '/offline.html',
+  '/manifest.json',
+  '/favicon.ico',
+  '/assets/images/icon.png',
 ];
 
-// Estratégia: Cache First, fallback para Network
+const isCacheableResponse = (response) =>
+  response && response.status === 200 && response.type !== 'opaqueredirect';
+
 const cacheFirst = async (request) => {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-  if (cached) {
-    return cached;
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  const response = await fetch(request);
+  if (isCacheableResponse(response)) {
+    const cache = await caches.open(RUNTIME_CACHE);
+    await cache.put(request, response.clone());
   }
-  try {
-    const response = await fetch(request);
-    if (response.status === 200) {
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (error) {
-    console.error('Fetch failed:', error);
-    throw error;
-  }
+  return response;
 };
 
-// Estratégia: Network First, fallback para Cache
 const networkFirst = async (request) => {
-  const cache = await caches.open(RUNTIME_CACHE);
   try {
     const response = await fetch(request);
-    if (response.status === 200) {
-      cache.put(request, response.clone());
+    if (isCacheableResponse(response)) {
+      const cache = await caches.open(RUNTIME_CACHE);
+      await cache.put(request, response.clone());
     }
     return response;
-  } catch (error) {
-    const cached = await cache.match(request);
-    if (cached) {
-      return cached;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+
+    if (request.mode === 'navigate' || request.destination === 'document') {
+      const offline = await caches.match('/offline.html');
+      if (offline) return offline;
     }
 
-    // Se for uma requisição de navegação e não temos cache, mostrar página offline
-    if (request.mode === 'navigate') {
-      const offlinePage = await cache.match('/offline.html');
-      if (offlinePage) {
-        return offlinePage;
-      }
-    }
-
-    throw error;
+    return new Response('Offline', {
+      status: 503,
+      statusText: 'Offline',
+      headers: { 'Content-Type': 'text/plain' },
+    });
   }
 };
 
-// Estratégia para imagens
-const cacheImages = async (request) => {
-  const cache = await caches.open(IMAGE_CACHE);
-  const cached = await cache.match(request);
-  if (cached) {
-    return cached;
-  }
-  try {
-    const response = await fetch(request);
-    if (response.status === 200) {
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (error) {
-    console.error('Image fetch failed:', error);
-    throw error;
-  }
-};
-
-// Install event
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Service Worker: Caching essential files');
-        return cache.addAll(urlsToCache);
-      })
+    caches
+      .open(STATIC_CACHE)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate event
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
   event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(
           cacheNames
-            .filter((name) => name !== CACHE_NAME && name !== RUNTIME_CACHE && name !== IMAGE_CACHE)
-            .map((name) => {
-              console.log('Service Worker: Deleting old cache:', name);
-              return caches.delete(name);
-            })
-        );
-      })
+            .filter((name) => ![STATIC_CACHE, RUNTIME_CACHE].includes(name))
+            .map((name) => caches.delete(name))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
 
-// Fetch event
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Ignorar requisições não HTTP/HTTPS (websockets, extensions, etc)
-  if (!url.protocol.startsWith('http')) {
-    return;
-  }
+  if (request.method !== 'GET') return;
+  if (!url.protocol.startsWith('http')) return;
 
-  // Ignorar requisições para APIs externas (Supabase) - deixa o navegador lidar direto
   if (url.hostname.includes('supabase.co')) {
     return;
   }
 
-  // Ignorar requisições de hot-reload/dev-server
-  if (url.pathname.includes('hot-update') || url.pathname.includes('socket.io') || url.pathname.includes('metro')) {
+  if (
+    url.pathname.includes('hot-update') ||
+    url.pathname.includes('socket.io') ||
+    url.pathname.includes('metro')
+  ) {
     return;
   }
 
-  // Cache para imagens
-  if (request.destination === 'image') {
-    event.respondWith(cacheImages(request));
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(networkFirst(request));
     return;
   }
 
-  // Cache para assets estáticos (JS, CSS)
   if (
     request.destination === 'script' ||
     request.destination === 'style' ||
+    request.destination === 'image' ||
     request.destination === 'font'
   ) {
     event.respondWith(cacheFirst(request));
     return;
   }
 
-  // Network First para páginas HTML
-  if (request.destination === 'document') {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-
-  // Comportamento padrão: apenas fetch sem interceptação
-  return;
+  event.respondWith(networkFirst(request));
 });
 
-// Background sync (se suportado)
-self.addEventListener('sync', (event) => {
-  console.log('Service Worker: Background sync', event.tag);
-  if (event.tag === 'sync-orders') {
-    event.waitUntil(syncOrders());
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
-
-async function syncOrders() {
-  // Implementar lógica de sincronização de pedidos offline
-  console.log('Service Worker: Syncing orders...');
-} 

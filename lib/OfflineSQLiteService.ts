@@ -50,7 +50,7 @@ class OfflineSQLiteService {
       return `${Date.now()}-${Math.random()}`;
     }
 
-    const preferredKeys = ['id', 'code', 'user_id', 'pedido_id'];
+    const preferredKeys = ['id', 'code', 'user_id', 'pedido_id', 'codcli'];
     for (const key of preferredKeys) {
       if (record[key] !== undefined && record[key] !== null && String(record[key]) !== '') {
         return String(record[key]);
