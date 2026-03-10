@@ -33,6 +33,60 @@ export interface QueueProcessResult {
 class OfflineMutationQueue {
   private static TABLE = 'pending_ops_queue';
 
+  private static isValidOpType(value: unknown): value is PendingOpType {
+    return value === 'insert' || value === 'upsert' || value === 'update' || value === 'delete';
+  }
+
+  private static parsePayload(payload: unknown): OfflineMutationPayload | null {
+    if (typeof payload !== 'string' || payload.trim() === '') {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(payload);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+      return parsed as OfflineMutationPayload;
+    } catch {
+      return null;
+    }
+  }
+
+  private static hasKeys(obj: unknown): boolean {
+    return !!obj && typeof obj === 'object' && Object.keys(obj as Record<string, any>).length > 0;
+  }
+
+  private static hasMeaningfulPayload(opType: PendingOpType, payload: OfflineMutationPayload): boolean {
+    if (opType === 'insert' || opType === 'upsert') {
+      if (this.hasKeys(payload.data)) return true;
+      return this.hasKeys(payload);
+    }
+
+    if (opType === 'update') {
+      return this.hasKeys(payload.values) || this.hasKeys(payload.data);
+    }
+
+    return this.hasKeys(payload.filters);
+  }
+
+  private static isRealPendingOp(row: PendingOpRecord): boolean {
+    if (!row || row.synced_at) {
+      return false;
+    }
+
+    if (!row.table_name || !this.isValidOpType(row.op_type)) {
+      return false;
+    }
+
+    const payload = this.parsePayload(row.payload);
+    if (!payload) {
+      return false;
+    }
+
+    return this.hasMeaningfulPayload(row.op_type, payload);
+  }
+
   static async enqueue(
     tableName: string,
     opType: PendingOpType,
@@ -92,7 +146,7 @@ class OfflineMutationQueue {
     const now = new Date().toISOString();
     const pending = (await SQLiteStore.getAll(this.TABLE))
       .map((row) => row.payload as PendingOpRecord)
-      .filter((row) => !row.synced_at && (!row.next_retry_at || row.next_retry_at <= now))
+      .filter((row) => this.isRealPendingOp(row) && (!row.next_retry_at || row.next_retry_at <= now))
       .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
       .slice(0, limit);
     const result: QueueProcessResult = {
@@ -157,8 +211,8 @@ class OfflineMutationQueue {
   static async getStats(): Promise<{ pending: number; failed: number }> {
     const rows = (await SQLiteStore.getAll(this.TABLE)).map((r) => r.payload as PendingOpRecord);
     return {
-      pending: rows.filter((r) => !r.synced_at).length,
-      failed: rows.filter((r) => !r.synced_at && (r.retry_count || 0) > 0).length,
+      pending: rows.filter((r) => this.isRealPendingOp(r)).length,
+      failed: rows.filter((r) => this.isRealPendingOp(r) && (r.retry_count || 0) > 0).length,
     };
   }
 

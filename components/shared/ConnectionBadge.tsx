@@ -3,8 +3,13 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { Wifi, WifiOff } from 'lucide-react-native';
 
-export function ConnectionBadge() {
-  const isOnline = useOnlineStatus();
+interface ConnectionBadgeProps {
+  isOnlineOverride?: boolean;
+}
+
+export function ConnectionBadge({ isOnlineOverride }: ConnectionBadgeProps) {
+  const hookIsOnline = useOnlineStatus();
+  const isOnline = typeof isOnlineOverride === 'boolean' ? isOnlineOverride : hookIsOnline;
 
   if (Platform.OS !== 'web') {
     return null;

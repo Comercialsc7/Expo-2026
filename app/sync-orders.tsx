@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Modal, Image, ViewStyle, TextStyle, ImageStyle } from 'react-native';
 import { useNavigation } from '../hooks/useNavigation';
 import { useCachedOrdersStore, CachedOrder } from '../store/useCachedOrdersStore';
@@ -11,6 +11,8 @@ import { useSyncService } from '../hooks/useSyncService';
 import SQLiteStore from '../lib/SQLiteStore';
 import { ConnectionBadge } from '../components/shared/ConnectionBadge';
 import OfflineSQLiteService from '../lib/OfflineSQLiteService';
+import OfflineMutationQueue from '../lib/OfflineMutationQueue';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 const closeIcon = require('../assets/images/x.png');
 const backIcon = require('../assets/images/voltar.png');
@@ -22,6 +24,7 @@ export default function SyncOrdersScreen() {
   const { goBack } = useNavigation();
   const { cachedOrders, clearCachedOrders, getOrderById, _hasHydrated, removeCachedOrder } = useCachedOrdersStore();
   const { syncing, progress, total, message, error: syncError, sync, upload, download, downloadTable } = useSyncService();
+  const isOnline = useOnlineStatus();
   const [isSending, setIsSending] = useState(false);
   const [isReceiving, setIsReceiving] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -30,6 +33,11 @@ export default function SyncOrdersScreen() {
   const [orderIdToDelete, setOrderIdToDelete] = useState<string | null>(null);
   const [sentOrders, setSentOrders] = useState<string[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
+  const [requiresManualUpdate, setRequiresManualUpdate] = useState(false);
+  const [showReconnectNotice, setShowReconnectNotice] = useState(false);
+  const [lastNoticeDismissAt, setLastNoticeDismissAt] = useState<number | null>(null);
+  const previousOnlineRef = useRef<boolean | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const blurActiveElementOnWeb = useCallback(() => {
     if (typeof document === 'undefined') return;
@@ -48,14 +56,8 @@ export default function SyncOrdersScreen() {
   useEffect(() => {
     async function countPending() {
       try {
-        const allTables = await SQLiteStore.getAllTables();
-        let count = 0;
-        for (const table of allTables) {
-          const records = await SQLiteStore.getAll(table);
-          const unsynced = records.filter(r => !r.payload._synced);
-          count += unsynced.length;
-        }
-        setPendingCount(count);
+        const stats = await OfflineMutationQueue.getStats();
+        setPendingCount(stats.pending);
       } catch (error) {
         console.error('Erro ao contar registros pendentes:', error);
       }
@@ -64,6 +66,55 @@ export default function SyncOrdersScreen() {
     const interval = setInterval(countPending, 3000);
     return () => clearInterval(interval);
   }, [syncing]);
+
+  useEffect(() => {
+    const previous = previousOnlineRef.current;
+
+    if (previous === null) {
+      previousOnlineRef.current = isOnline;
+      return;
+    }
+
+    if (!previous && isOnline) {
+      setRequiresManualUpdate(true);
+      setShowReconnectNotice(true);
+      setLastNoticeDismissAt(null);
+    }
+
+    previousOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (noticeTimerRef.current) {
+      clearTimeout(noticeTimerRef.current);
+      noticeTimerRef.current = null;
+    }
+
+    if (!requiresManualUpdate || !isOnline || showReconnectNotice || !lastNoticeDismissAt) {
+      return;
+    }
+
+    const elapsed = Date.now() - lastNoticeDismissAt;
+    const waitMs = Math.max(0, 45000 - elapsed);
+
+    noticeTimerRef.current = setTimeout(() => {
+      if (isOnline && requiresManualUpdate) {
+        setShowReconnectNotice(true);
+      }
+    }, waitMs);
+
+    return () => {
+      if (noticeTimerRef.current) {
+        clearTimeout(noticeTimerRef.current);
+        noticeTimerRef.current = null;
+      }
+    };
+  }, [requiresManualUpdate, isOnline, showReconnectNotice, lastNoticeDismissAt]);
+
+  const dismissReconnectNotice = useCallback(() => {
+    setShowReconnectNotice(false);
+    setLastNoticeDismissAt(Date.now());
+  }, []);
 
   const handleSendData = useCallback(async () => {
     try {
@@ -260,6 +311,9 @@ export default function SyncOrdersScreen() {
       }
 
       Alert.alert('Sucesso', 'Dados atualizados do servidor!');
+      setRequiresManualUpdate(false);
+      setShowReconnectNotice(false);
+      setLastNoticeDismissAt(null);
     } catch (error) {
       Alert.alert('Erro', 'Falha ao baixar dados. Tente novamente.');
     }
@@ -285,6 +339,9 @@ export default function SyncOrdersScreen() {
       }
 
       Alert.alert('Sucesso', 'Sincronização completa concluída!');
+      setRequiresManualUpdate(false);
+      setShowReconnectNotice(false);
+      setLastNoticeDismissAt(null);
     } catch (error) {
       Alert.alert('Erro', 'Falha na sincronização. Tente novamente.');
     }
@@ -344,12 +401,27 @@ export default function SyncOrdersScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sincronização</Text>
         <View style={styles.headerBadge}>
-          <ConnectionBadge />
+          <ConnectionBadge isOnlineOverride={isOnline} />
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
         <View style={styles.content}>
           <Text style={styles.descriptionText}>Gerencie o envio e recebimento de dados de pedidos.</Text>
+
+          {showReconnectNotice && requiresManualUpdate && isOnline && (
+            <View style={styles.reconnectNotice}>
+              <Text style={styles.reconnectNoticeText}>
+                Conexão restabelecida. Realize "Atualizar Dados" para recarregar o cache offline.
+              </Text>
+              <TouchableOpacity
+                onPress={dismissReconnectNotice}
+                style={styles.reconnectNoticeCloseButton}
+                accessibilityLabel="Fechar aviso de atualização"
+              >
+                <Text style={styles.reconnectNoticeCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={styles.statsContainer}>
             <View style={styles.statBox}>
