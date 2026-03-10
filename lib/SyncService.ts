@@ -143,6 +143,60 @@ export class SyncService {
     };
   }
 
+  private static async downloadFullTableInBatches(
+    table: string,
+    timeoutMs: number,
+    batchSize: number = 1000
+  ): Promise<number> {
+    let offset = 0;
+    let downloaded = 0;
+
+    while (true) {
+      const selectQuery: any = supabase.from(table).select('*');
+      const requestPromise: Promise<{ data: any[]; error: any }> =
+        typeof selectQuery.range === 'function'
+          ? (selectQuery.range(offset, offset + batchSize - 1) as Promise<{ data: any[]; error: any }>)
+          : (selectQuery as Promise<{ data: any[]; error: any }>);
+
+      const result = await this.withTimeout(
+        requestPromise,
+        timeoutMs,
+        `${table}[${offset}-${offset + batchSize - 1}]`
+      );
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      const rows = result.data || [];
+      if (rows.length === 0) {
+        break;
+      }
+
+      for (const record of rows) {
+        await SQLiteStore.save(table, {
+          ...record,
+          _synced: true,
+        });
+      }
+
+      downloaded += rows.length;
+
+      if (rows.length < batchSize) {
+        break;
+      }
+
+      // Fallback para ambientes sem suporte a paginação no client (ex: mocks de teste).
+      if (typeof selectQuery.range !== 'function') {
+        break;
+      }
+
+      offset += batchSize;
+    }
+
+    return downloaded;
+  }
+
   /**
    * Busca metadados de sincronização do PouchDB
    */
@@ -368,6 +422,7 @@ export class SyncService {
 
       const { tables } = config;
       const timeoutMs = config.downloadTimeoutMs ?? 60000;
+      const batchSize = config.batchSize ?? 1000;
       const total = tables.length;
       let processed = 0;
 
@@ -375,6 +430,29 @@ export class SyncService {
         try {
           // Busca o último download desta tabela
           const syncMeta = await this.getSyncMeta(table);
+          // Download completo em lotes para evitar estouro de memória no Web.
+          if (!syncMeta.last_download_at) {
+            await SQLiteStore.clear(table);
+            const fullDownloaded = await this.downloadFullTableInBatches(table, timeoutMs, batchSize);
+            results.downloaded[table] = fullDownloaded;
+            console.log(`✅ [SyncService] ${fullDownloaded} registros baixados de '${table}' (lotes)`);
+
+            await this.updateSyncMeta(table, {
+              last_download_at: downloadTimestamp,
+            });
+
+            processed++;
+            if (emitLifecycle) {
+              this.emit({
+                type: 'sync-progress',
+                message: `Baixando ${table} (${processed}/${total})`,
+                progress: processed,
+                total,
+              });
+            }
+            continue;
+          }
+
           const { data, error, filterColumn } = await this.runDownloadQuery(
             table,
             syncMeta.last_download_at,
@@ -571,9 +649,22 @@ export class SyncService {
     try {
       const downloadTimestamp = new Date().toISOString();
       const syncMeta = fullRefresh ? null : await this.getSyncMeta(table);
+
+      if (fullRefresh || !syncMeta?.last_download_at) {
+        await SQLiteStore.clear(table);
+        const fullDownloaded = await this.downloadFullTableInBatches(table, timeoutMs, 1000);
+
+        await this.updateSyncMeta(table, {
+          last_download_at: downloadTimestamp,
+        });
+
+        console.log(`✅ [SyncService] ${fullDownloaded} registros baixados de '${table}' (lotes)`);
+        return fullDownloaded;
+      }
+
       const { data, error, filterColumn } = await this.runDownloadQuery(
         table,
-        fullRefresh ? null : (syncMeta?.last_download_at || null),
+        syncMeta.last_download_at,
         timeoutMs
       );
 

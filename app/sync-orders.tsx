@@ -10,7 +10,6 @@ import { styles } from './styles/_sync-orders.styles';
 import { useSyncService } from '../hooks/useSyncService';
 import SQLiteStore from '../lib/SQLiteStore';
 import { ConnectionBadge } from '../components/shared/ConnectionBadge';
-import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 import OfflineMutationQueue from '../lib/OfflineMutationQueue';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
@@ -299,17 +298,6 @@ export default function SyncOrdersScreen() {
       // Download completo dos dados necessários para operação offline
       await download(syncTables, 60000);
 
-      // Espelha também em SQLite para telas sqlite-first
-      for (const table of syncTables) {
-        try {
-          const localRecords = await SQLiteStore.getAll(table);
-          const payloads = localRecords.map((record) => record.payload);
-          await OfflineSQLiteService.replaceTable(table, payloads);
-        } catch (sqliteError) {
-          console.warn(`⚠️ Falha ao espelhar '${table}' para SQLite após download:`, sqliteError);
-        }
-      }
-
       Alert.alert('Sucesso', 'Dados atualizados do servidor!');
       setRequiresManualUpdate(false);
       setShowReconnectNotice(false);
@@ -327,15 +315,6 @@ export default function SyncOrdersScreen() {
       // 2) Força download completo de cada tabela crítica para garantir cache offline
       for (const table of syncTables) {
         await downloadTable(table, true);
-
-        // 3) Espelha os dados no SQLite para persistência offline robusta
-        try {
-          const localRecords = await SQLiteStore.getAll(table);
-          const payloads = localRecords.map((record) => record.payload);
-          await OfflineSQLiteService.replaceTable(table, payloads);
-        } catch (sqliteError) {
-          console.warn(`⚠️ Falha ao espelhar '${table}' para SQLite:`, sqliteError);
-        }
       }
 
       Alert.alert('Sucesso', 'Sincronização completa concluída!');
