@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import TableStore from '../lib/TableStore';
 import OfflineSQLiteService from '../lib/OfflineSQLiteService';
+import OfflineMutationQueue from '../lib/OfflineMutationQueue';
 
 export interface Product {
   id: string;
@@ -178,6 +179,18 @@ export const useProducts = () => {
       try {
         await TableStore.set('products', updatedProducts);
         await OfflineSQLiteService.replaceTable('products', updatedProducts);
+        await OfflineMutationQueue.enqueue(
+          'products',
+          'update',
+          {
+            values: {
+              is_accelerator: isAccelerator,
+              updated_at: new Date().toISOString(),
+            },
+            filters: { id: productId },
+          },
+          `products:update:id:${productId}:accelerator:${isAccelerator ? 1 : 0}`
+        );
       } catch (cacheError) {
         console.warn('⚠️ Falha ao salvar alteração local offline:', cacheError);
       }

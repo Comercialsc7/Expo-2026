@@ -90,12 +90,12 @@ vi.mock('../lib/supabase', () => {
   };
 });
 
-import LocalDB from '../lib/LocalDB';
+import SQLiteStore from '../lib/SQLiteStore';
 import SyncService from '../lib/SyncService';
 
 describe('Offline order queue and reconnection sync', () => {
   beforeEach(async () => {
-    await LocalDB.clearAll();
+    await SQLiteStore.clearAll();
     vi.clearAllMocks();
 
     upsertMock.mockResolvedValue({ error: null });
@@ -107,7 +107,7 @@ describe('Offline order queue and reconnection sync', () => {
   });
 
   it('envia pedidos pendentes na reconexão e mantém pedido local marcado como sincronizado', async () => {
-    await LocalDB.save('pedidos', {
+    await SQLiteStore.save('pedidos', {
       id: 'pedido-local-1',
       cliente_nome: 'Cliente Offline',
       total: 150,
@@ -115,7 +115,7 @@ describe('Offline order queue and reconnection sync', () => {
     });
 
     const result = await SyncService.upload({ tables: ['pedidos'] });
-    const remaining = await LocalDB.getAll('pedidos');
+    const remaining = await SQLiteStore.getAll('pedidos');
 
     expect(result.success).toBe(1);
     expect(result.failed).toBe(0);
@@ -134,13 +134,13 @@ describe('Offline order queue and reconnection sync', () => {
   });
 
   it('não envia tabelas de referência no upload e preserva cache de clientes', async () => {
-    await LocalDB.save('clients', {
+    await SQLiteStore.save('clients', {
       id: 'cli-1',
       nome: 'Cliente Referência',
       _synced: false,
     });
 
-    await LocalDB.save('pedidos', {
+    await SQLiteStore.save('pedidos', {
       id: 'pedido-local-2',
       cliente_nome: 'Cliente Referência',
       total: 200,
@@ -148,7 +148,7 @@ describe('Offline order queue and reconnection sync', () => {
     });
 
     const result = await SyncService.upload();
-    const clients = await LocalDB.getAll('clients');
+    const clients = await SQLiteStore.getAll('clients');
 
     expect(result.success).toBe(1);
     expect(result.failed).toBe(0);
@@ -164,7 +164,7 @@ describe('Offline order queue and reconnection sync', () => {
   });
 
   it('faz download incremental e salva novos pedidos como sincronizados', async () => {
-    await LocalDB.save('sync_meta', {
+    await SQLiteStore.save('sync_meta', {
       table: 'pedidos',
       last_download_at: '2026-03-01T10:00:00.000Z',
       last_upload_at: null,
@@ -182,7 +182,7 @@ describe('Offline order queue and reconnection sync', () => {
     });
 
     const downloaded = await SyncService.downloadTable('pedidos');
-    const localOrders = await LocalDB.getAll('pedidos');
+    const localOrders = await SQLiteStore.getAll('pedidos');
     const meta = await SyncService.getSyncMetadata('pedidos');
 
     expect(downloaded).toBe(1);
@@ -218,7 +218,7 @@ describe('Offline order queue and reconnection sync', () => {
   });
 
   it('faz fallback para created_at quando updated_at não existe', async () => {
-    await LocalDB.save('sync_meta', {
+    await SQLiteStore.save('sync_meta', {
       table: 'pedidos',
       last_download_at: '2026-03-01T10:00:00.000Z',
       last_upload_at: null,
@@ -244,7 +244,7 @@ describe('Offline order queue and reconnection sync', () => {
       });
 
     const downloaded = await SyncService.downloadTable('pedidos');
-    const localOrders = await LocalDB.getAll('pedidos');
+    const localOrders = await SQLiteStore.getAll('pedidos');
 
     expect(downloaded).toBe(1);
     expect(gtMock).toHaveBeenCalledWith('updated_at', '2026-03-01T10:00:00.000Z');

@@ -1,5 +1,6 @@
-import LocalDB from './LocalDB';
+import SQLiteStore from './SQLiteStore';
 import { supabase } from './supabase';
+import OfflineMutationQueue from './OfflineMutationQueue';
 
 export type SyncEventType = 'sync-start' | 'sync-progress' | 'sync-completed' | 'sync-error';
 
@@ -31,6 +32,10 @@ export class SyncService {
     'order_items',
     'itens_pedido',
   ]);
+
+  private static getSyncMetaId(table: string): string {
+    return `sync_meta:${table}`;
+  }
 
   static on(eventType: SyncEventType, listener: EventListener): void {
     if (!this.listeners.has(eventType)) {
@@ -146,10 +151,15 @@ export class SyncService {
     last_download_at: string | null;
   }> {
     try {
-      const records = await LocalDB.getAll(this.SYNC_META_TABLE);
-      const meta = records.find(r => r.payload.table === table);
+      let meta = await SQLiteStore.getById(this.SYNC_META_TABLE, this.getSyncMetaId(table));
 
-      if (meta) {
+      // Compatibilidade com metadados legados sem _id determinístico.
+      if (!meta) {
+        const records = await SQLiteStore.getAll(this.SYNC_META_TABLE);
+        meta = records.find(r => r.payload.table === table) || null;
+      }
+
+      if (meta?.payload) {
         return {
           last_upload_at: meta.payload.last_upload_at || null,
           last_download_at: meta.payload.last_download_at || null,
@@ -180,17 +190,18 @@ export class SyncService {
     }
   ): Promise<void> {
     try {
-      const records = await LocalDB.getAll(this.SYNC_META_TABLE);
+      const records = await SQLiteStore.getAll(this.SYNC_META_TABLE);
       const existing = records.find(r => r.payload.table === table);
 
       const payload = {
+        _id: this.getSyncMetaId(table),
         table,
         last_upload_at: updates.last_upload_at || existing?.payload.last_upload_at || null,
         last_download_at: updates.last_download_at || existing?.payload.last_download_at || null,
         updated_at: new Date().toISOString(),
       };
 
-      await LocalDB.save(this.SYNC_META_TABLE, payload);
+      await SQLiteStore.save(this.SYNC_META_TABLE, payload);
       console.log(`✅ sync_meta atualizado para '${table}'`);
     } catch (error) {
       console.error(`Erro ao atualizar sync_meta de '${table}':`, error);
@@ -215,7 +226,19 @@ export class SyncService {
         this.emit({ type: 'sync-start', message: 'Iniciando upload...' });
       }
 
-      const allTables = await LocalDB.getAllTables();
+      // Primeiro drena a fila transacional de mutacoes offline.
+      try {
+        const queueResult = await OfflineMutationQueue.flushWithSupabase(200);
+        if (queueResult.failed > 0) {
+          console.warn(
+            `⚠️ [SyncService] Fila de mutacoes: ${queueResult.succeeded} sucesso(s), ${queueResult.failed} falha(s)`
+          );
+        }
+      } catch (queueError) {
+        console.error('❌ [SyncService] Erro ao processar fila de mutacoes offline:', queueError);
+      }
+
+      const allTables = await SQLiteStore.getAllTables();
       const configuredTables = config?.tables ? new Set(config.tables) : null;
       const records = [];
       const processedTables = new Set<string>();
@@ -226,7 +249,7 @@ export class SyncService {
         if (!this.UPLOAD_TABLES.has(table)) continue;
         if (configuredTables && !configuredTables.has(table)) continue;
 
-        const tableRecords = await LocalDB.getAll(table);
+        const tableRecords = await SQLiteStore.getAll(table);
         const unsyncedRecords = tableRecords.filter(
           (record) => !record.payload._synced
         );
@@ -270,7 +293,7 @@ export class SyncService {
             throw error;
           }
 
-          await LocalDB.save(table, {
+          await SQLiteStore.save(table, {
             ...record.payload,
             _id: record._id,
             _synced: true,
@@ -369,12 +392,12 @@ export class SyncService {
           if (data && data.length > 0) {
             // Se é primeira vez, limpa a tabela
             if (!syncMeta.last_download_at) {
-              await LocalDB.clear(table);
+              await SQLiteStore.clear(table);
             }
 
             // Salva os registros novos/atualizados
             for (const record of data) {
-              await LocalDB.save(table, {
+              await SQLiteStore.save(table, {
                 ...record,
                 _synced: true,
               });
@@ -508,7 +531,7 @@ export class SyncService {
     };
 
     try {
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
       const unsyncedRecords = records.filter((record) => !record.payload._synced);
 
       for (const record of unsyncedRecords) {
@@ -525,7 +548,7 @@ export class SyncService {
             throw error;
           }
 
-          await LocalDB.save(table, {
+          await SQLiteStore.save(table, {
             ...record.payload,
             _id: record._id,
             _synced: true,
@@ -564,11 +587,11 @@ export class SyncService {
 
       if (data && data.length > 0) {
         if (fullRefresh || !syncMeta?.last_download_at) {
-          await LocalDB.clear(table);
+          await SQLiteStore.clear(table);
         }
 
         for (const record of data) {
-          await LocalDB.save(table, {
+          await SQLiteStore.save(table, {
             ...record,
             _synced: true,
           });
@@ -636,7 +659,7 @@ export class SyncService {
     last_download_at: string | null;
   }>> {
     try {
-      const records = await LocalDB.getAll(this.SYNC_META_TABLE);
+      const records = await SQLiteStore.getAll(this.SYNC_META_TABLE);
       return records.map(r => ({
         table: r.payload.table,
         last_upload_at: r.payload.last_upload_at || null,
@@ -653,12 +676,21 @@ export class SyncService {
    */
   static async resetSyncMetadata(table: string): Promise<void> {
     try {
-      const records = await LocalDB.getAll(this.SYNC_META_TABLE);
-      const meta = records.find(r => r.payload.table === table);
+      const metaId = this.getSyncMetaId(table);
+      const meta = await SQLiteStore.getById(this.SYNC_META_TABLE, metaId);
 
       if (meta) {
-        await LocalDB.delete(meta._id);
+        await SQLiteStore.delete(metaId);
         console.log(`✅ Metadados de sincronização resetados para '${table}'`);
+        return;
+      }
+
+      // Remove registros legados sem _id padronizado.
+      const records = await SQLiteStore.getAll(this.SYNC_META_TABLE);
+      const legacy = records.find(r => r.payload.table === table);
+      if (legacy?._id) {
+        await SQLiteStore.delete(legacy._id);
+        console.log(`✅ Metadados legados de sincronização resetados para '${table}'`);
       }
     } catch (error) {
       console.error(`Erro ao resetar sync_meta de '${table}':`, error);
@@ -670,7 +702,7 @@ export class SyncService {
    */
   static async resetAllSyncMetadata(): Promise<void> {
     try {
-      await LocalDB.clear(this.SYNC_META_TABLE);
+      await SQLiteStore.clear(this.SYNC_META_TABLE);
       console.log('✅ Todos os metadados de sincronização foram resetados');
     } catch (error) {
       console.error('Erro ao resetar todos sync_meta:', error);
@@ -679,3 +711,4 @@ export class SyncService {
 }
 
 export default SyncService;
+

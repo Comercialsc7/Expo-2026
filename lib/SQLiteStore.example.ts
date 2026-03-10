@@ -1,4 +1,4 @@
-import LocalDB from './LocalDB';
+import SQLiteStore from './SQLiteStore';
 
 interface Product {
   id: string;
@@ -13,7 +13,7 @@ interface Order {
   total: number;
 }
 
-export const LocalDBExamples = {
+export const SQLiteStoreExamples = {
   async saveProduct() {
     const product: Product = {
       id: '123',
@@ -21,23 +21,23 @@ export const LocalDBExamples = {
       price: 99.9,
     };
 
-    const saved = await LocalDB.save('products', product);
+    const saved = await SQLiteStore.save('products', product);
     console.log('Product saved:', saved);
   },
 
   async getAllProducts() {
-    const products = await LocalDB.getAll('products');
+    const products = await SQLiteStore.getAll('products');
     console.log('All products:', products);
     return products;
   },
 
   async removeProduct(id: string) {
-    const removed = await LocalDB.remove('products', id);
+    const removed = await SQLiteStore.remove('products', id);
     console.log('Product removed:', removed);
   },
 
   async clearProducts() {
-    const count = await LocalDB.clear('products');
+    const count = await SQLiteStore.clear('products');
     console.log(`Cleared ${count} products`);
   },
 
@@ -49,12 +49,12 @@ export const LocalDBExamples = {
       total: 199.8,
     };
 
-    const saved = await LocalDB.save('orders', order);
+    const saved = await SQLiteStore.save('orders', order);
     console.log('Order saved:', saved);
   },
 
   async searchOrders() {
-    const orders = await LocalDB.search('orders', (order: Order) => {
+    const orders = await SQLiteStore.search('orders', (order: Order) => {
       return order.total > 100;
     });
     console.log('Orders with total > 100:', orders);
@@ -62,22 +62,23 @@ export const LocalDBExamples = {
   },
 
   async getAllTables() {
-    const tables = await LocalDB.getAllTables();
+    const tables = await SQLiteStore.getAllTables();
     console.log('All tables:', tables);
     return tables;
   },
 
   async getDatabaseInfo() {
-    const info = await LocalDB.getInfo();
+    const info = await SQLiteStore.getInfo();
     console.log('Database info:', info);
     return info;
   },
 
   async countRecords() {
-    const productCount = await LocalDB.count('products');
-    const orderCount = await LocalDB.count('orders');
+    const productCount = await SQLiteStore.count('products');
+    const orderCount = await SQLiteStore.count('orders');
     console.log(`Products: ${productCount}, Orders: ${orderCount}`);
   },
 };
 
-export default LocalDBExamples;
+export default SQLiteStoreExamples;
+

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
-import { useLocalDB } from '../../hooks/useLocalDB';
+import { useSQLiteStore } from '../../hooks/useSQLiteStore';
 
 interface Task {
   id?: string;
@@ -8,9 +8,9 @@ interface Task {
   completed: boolean;
 }
 
-export function LocalDBExample() {
+export function SQLiteStoreExample() {
   const [taskTitle, setTaskTitle] = useState('');
-  const { data: tasks, loading, error, save, remove, clear, count } = useLocalDB<Task>('tasks');
+  const { data: tasks, loading, error, save, remove, clear, count } = useSQLiteStore<Task>('tasks');
 
   const handleAddTask = async () => {
     if (!taskTitle.trim()) return;
@@ -48,7 +48,7 @@ export function LocalDBExample() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>LocalDB Example - Tasks</Text>
+      <Text style={styles.title}>SQLiteStore Example - Tasks</Text>
       <Text style={styles.count}>Total: {count} tasks</Text>
 
       {error && <Text style={styles.error}>{error}</Text>}
@@ -213,4 +213,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LocalDBExample;
+export default SQLiteStoreExample;
+

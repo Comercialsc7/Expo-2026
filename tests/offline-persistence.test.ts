@@ -72,12 +72,12 @@ vi.mock('../lib/pouchdb', () => {
   };
 });
 
-import LocalDB from '../lib/LocalDB';
+import SQLiteStore from '../lib/SQLiteStore';
 import TableStore from '../lib/TableStore';
 
 describe('Offline persistence across app tables', () => {
   beforeEach(async () => {
-    await LocalDB.clearAll();
+    await SQLiteStore.clearAll();
   });
 
   it('persiste produtos, clientes e marcas ao mesmo tempo (não só produtos)', async () => {

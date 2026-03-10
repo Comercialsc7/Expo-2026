@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || Constants.expoConfig?.extra?.supabaseUrl || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || Constants.expoConfig?.extra?.supabaseAnonKey || '';
@@ -19,6 +20,7 @@ const supabaseConfig = {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: Platform.OS === 'web',
+    ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),
   },
   global: {
     headers: {

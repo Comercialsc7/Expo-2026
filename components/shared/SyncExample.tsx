@@ -8,8 +8,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSyncService } from '../../hooks/useSyncService';
-import { useLocalDB } from '../../hooks/useLocalDB';
-import LocalDB from '../../lib/LocalDB';
+import { useSQLiteStore } from '../../hooks/useSQLiteStore';
+import SQLiteStore from '../../lib/SQLiteStore';
 
 interface DemoRecord {
   id?: string;
@@ -21,7 +21,7 @@ interface DemoRecord {
 export function SyncExample() {
   const { syncing, progress, total, message, error, sync, upload, download } =
     useSyncService();
-  const { data: localRecords, save, clear } = useLocalDB<DemoRecord>('demo_table');
+  const { data: localRecords, save, clear } = useSQLiteStore<DemoRecord>('demo_table');
   const [localCount, setLocalCount] = useState(0);
 
   const handleAddLocalRecord = async () => {
@@ -66,7 +66,7 @@ export function SyncExample() {
   };
 
   const updateLocalCount = async () => {
-    const count = await LocalDB.count('demo_table');
+    const count = await SQLiteStore.count('demo_table');
     setLocalCount(count);
   };
 

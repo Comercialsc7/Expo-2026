@@ -8,7 +8,7 @@ import { OrderItem } from './components/OrderItem';
 import { OrderDetailsModal } from './components/OrderDetailsModal';
 import { styles } from './styles/_sync-orders.styles';
 import { useSyncService } from '../hooks/useSyncService';
-import LocalDB from '../lib/LocalDB';
+import SQLiteStore from '../lib/SQLiteStore';
 import { ConnectionBadge } from '../components/shared/ConnectionBadge';
 import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 
@@ -48,10 +48,10 @@ export default function SyncOrdersScreen() {
   useEffect(() => {
     async function countPending() {
       try {
-        const allTables = await LocalDB.getAllTables();
+        const allTables = await SQLiteStore.getAllTables();
         let count = 0;
         for (const table of allTables) {
-          const records = await LocalDB.getAll(table);
+          const records = await SQLiteStore.getAll(table);
           const unsynced = records.filter(r => !r.payload._synced);
           count += unsynced.length;
         }
@@ -251,7 +251,7 @@ export default function SyncOrdersScreen() {
       // Espelha também em SQLite para telas sqlite-first
       for (const table of syncTables) {
         try {
-          const localRecords = await LocalDB.getAll(table);
+          const localRecords = await SQLiteStore.getAll(table);
           const payloads = localRecords.map((record) => record.payload);
           await OfflineSQLiteService.replaceTable(table, payloads);
         } catch (sqliteError) {
@@ -276,7 +276,7 @@ export default function SyncOrdersScreen() {
 
         // 3) Espelha os dados no SQLite para persistência offline robusta
         try {
-          const localRecords = await LocalDB.getAll(table);
+          const localRecords = await SQLiteStore.getAll(table);
           const payloads = localRecords.map((record) => record.payload);
           await OfflineSQLiteService.replaceTable(table, payloads);
         } catch (sqliteError) {

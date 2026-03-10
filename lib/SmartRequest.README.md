@@ -99,7 +99,7 @@ await SmartRequest.insert('pedidos', data);
 // SmartRequest detecta: navigator.onLine === false
 await SmartRequest.insert('pedidos', data);
 // ↓
-// LocalDB.save('pedidos', { ...data, _synced: false })
+// SQLiteStore.save('pedidos', { ...data, _synced: false })
 // ↓
 // Retorna dados salvos localmente
 // ↓

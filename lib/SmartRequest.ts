@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
-import LocalDB from './LocalDB';
+import SQLiteStore from './SQLiteStore';
 import { Platform } from 'react-native';
+import OfflineMutationQueue from './OfflineMutationQueue';
 
 /**
  * SmartRequest - Helper inteligente para requisições
@@ -73,7 +74,14 @@ class SmartRequest {
       _timestamp: new Date().toISOString(),
     };
 
-    const saved = await LocalDB.save(table, record);
+    const saved = await SQLiteStore.save(table, record);
+    const opKey = payload?.id ? `${table}:insert:${payload.id}` : undefined;
+    await OfflineMutationQueue.enqueue(
+      table,
+      'insert',
+      { data: payload },
+      opKey
+    );
     console.log(`✅ [SmartRequest] Salvo offline em '${table}' (será sincronizado depois)`);
 
     return saved.payload;
@@ -154,7 +162,7 @@ class SmartRequest {
     console.log(`💾 [SmartRequest] SELECT offline em '${table}'`);
 
     try {
-      let records = await LocalDB.getAll(table);
+      let records = await SQLiteStore.getAll(table);
 
       // Extrai os payloads
       let results = records.map(r => r.payload);
@@ -246,7 +254,16 @@ class SmartRequest {
       _timestamp: new Date().toISOString(),
     };
 
-    const saved = await LocalDB.save(table, record);
+    const saved = await SQLiteStore.save(table, record);
+    await OfflineMutationQueue.enqueue(
+      table,
+      'update',
+      {
+        values: payload,
+        filters: { id },
+      },
+      `${table}:update:id:${id}`
+    );
     console.log(`✅ [SmartRequest] Atualização salva offline em '${table}' (será sincronizado depois)`);
 
     return saved.payload;
@@ -303,7 +320,15 @@ class SmartRequest {
       _timestamp: new Date().toISOString(),
     };
 
-    await LocalDB.save(table, record);
+    await SQLiteStore.save(table, record);
+    await OfflineMutationQueue.enqueue(
+      table,
+      'delete',
+      {
+        filters: { id },
+      },
+      `${table}:delete:id:${id}`
+    );
     console.log(`✅ [SmartRequest] Exclusão marcada offline em '${table}' (será sincronizado depois)`);
   }
 
@@ -356,7 +381,14 @@ class SmartRequest {
       _timestamp: new Date().toISOString(),
     };
 
-    const saved = await LocalDB.save(table, record);
+    const saved = await SQLiteStore.save(table, record);
+    const opKey = payload?.id ? `${table}:upsert:${payload.id}` : undefined;
+    await OfflineMutationQueue.enqueue(
+      table,
+      'upsert',
+      { data: payload },
+      opKey
+    );
     console.log(`✅ [SmartRequest] Upsert salvo offline em '${table}' (será sincronizado depois)`);
 
     return saved.payload;
@@ -364,3 +396,4 @@ class SmartRequest {
 }
 
 export default SmartRequest;
+

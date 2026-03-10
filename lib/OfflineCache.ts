@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import Constants from 'expo-constants';
 import TableStore from './TableStore';
+import SQLiteStore from './SQLiteStore';
+import OfflineSQLiteService from './OfflineSQLiteService';
 
 /**
  * OfflineCache - Sistema de pré-cache para funcionar offline
@@ -16,7 +18,10 @@ class OfflineCache {
     USER: '@app:user',
     CACHED_AT: '@app:cached_at',
     TABLES_CACHED: '@app:tables_cached',
+    SESSION_LAST_VALIDATED_AT: '@app:session_last_validated_at',
   };
+
+  private static SESSION_OFFLINE_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
 
   /**
    * Prepara o app para trabalhar offline
@@ -110,6 +115,10 @@ class OfflineCache {
       await AsyncStorage.setItem(
         this.KEYS.SESSION,
         JSON.stringify(session)
+      );
+      await AsyncStorage.setItem(
+        this.KEYS.SESSION_LAST_VALIDATED_AT,
+        new Date().toISOString()
       );
 
       // Salva dados do usuário separadamente (mais fácil acesso)
@@ -233,10 +242,26 @@ class OfflineCache {
     try {
       console.log('🗑️ [OfflineCache] Limpando cache offline...');
 
+      const tablesJson = await AsyncStorage.getItem(this.KEYS.TABLES_CACHED);
+      const cachedTables: string[] = tablesJson ? JSON.parse(tablesJson) : [];
+
       await AsyncStorage.removeItem(this.KEYS.SESSION);
       await AsyncStorage.removeItem(this.KEYS.USER);
       await AsyncStorage.removeItem(this.KEYS.CACHED_AT);
       await AsyncStorage.removeItem(this.KEYS.TABLES_CACHED);
+      await AsyncStorage.removeItem(this.KEYS.SESSION_LAST_VALIDATED_AT);
+
+      // Limpa espelho SQLite tabela a tabela para evitar resíduos locais.
+      for (const table of cachedTables) {
+        try {
+          await OfflineSQLiteService.clearTable(table);
+        } catch (sqliteError) {
+          console.warn(`⚠️ [OfflineCache] Falha ao limpar SQLite da tabela '${table}':`, sqliteError);
+        }
+      }
+
+      // Limpa o banco local principal (inclui dados em cache e metadados de sync).
+      await SQLiteStore.clearAll();
 
       console.log('✅ [OfflineCache] Cache limpo');
     } catch (error) {
@@ -284,15 +309,45 @@ class OfflineCache {
       }
 
       const session = JSON.parse(sessionJson);
+      const now = new Date();
 
-      // Verifica se o token ainda é válido
+      // Token ainda valido.
       if (session.expires_at) {
         const expiresAt = new Date(session.expires_at * 1000);
-        const now = new Date();
-        return expiresAt > now;
+        if (expiresAt > now) {
+          await AsyncStorage.setItem(this.KEYS.SESSION_LAST_VALIDATED_AT, now.toISOString());
+          return true;
+        }
+
+        // Se expirou, tenta refresh da sessao quando possivel.
+        try {
+          const { data, error } = await supabase.auth.refreshSession();
+          if (!error && data?.session) {
+            await AsyncStorage.setItem(this.KEYS.SESSION, JSON.stringify(data.session));
+            await AsyncStorage.setItem(this.KEYS.SESSION_LAST_VALIDATED_AT, now.toISOString());
+            return true;
+          }
+        } catch {
+          // Ignora: cai para janela de graca offline abaixo.
+        }
+
+        const validatedAt = await AsyncStorage.getItem(this.KEYS.SESSION_LAST_VALIDATED_AT);
+        if (validatedAt) {
+          const lastValidMs = new Date(validatedAt).getTime();
+          if (!Number.isNaN(lastValidMs) && now.getTime() - lastValidMs <= this.SESSION_OFFLINE_GRACE_MS) {
+            return true;
+          }
+        }
+
+        return false;
       }
 
-      return !!session.access_token;
+      if (session.access_token) {
+        await AsyncStorage.setItem(this.KEYS.SESSION_LAST_VALIDATED_AT, now.toISOString());
+        return true;
+      }
+
+      return false;
     } catch (error) {
       return false;
     }
@@ -334,3 +389,4 @@ class OfflineCache {
 }
 
 export default OfflineCache;
+

@@ -1,4 +1,4 @@
-import LocalDB from './LocalDB';
+import SQLiteStore from './SQLiteStore';
 
 /**
  * TableStore - Camada de abstração para gerenciar tabelas locais
@@ -27,18 +27,18 @@ class TableStore {
       console.log(`📦 [TableStore] SET iniciado em '${table}' (${items.length} registros)`);
 
       // Passo 1: Remover todos os registros antigos da tabela de uma vez
-      const oldRecords = await LocalDB.getAll(table);
+      const oldRecords = await SQLiteStore.getAll(table);
       if (oldRecords.length > 0) {
         console.log(`🗑️ [TableStore] Removendo ${oldRecords.length} registros antigos em lote...`);
         // Prepara os documentos para exclusão
-        await LocalDB.bulkDelete(oldRecords);
+        await SQLiteStore.bulkDelete(oldRecords);
       }
 
       // Passo 2: Preparar e Inserir novos registros em lote
       // PouchDB aceita o UUID no campo _id. Se o item já tem id, use-o como _id ou prefixe para evitar colisão
       const timestamp = new Date().toISOString();
       const recordsToSave = items.map(item => ({
-        _id: item.id || undefined, // Deixa o LocalDB gerar se não tiver, ou usa o ID do item
+        _id: item.id || undefined, // Deixa o SQLiteStore gerar se não tiver, ou usa o ID do item
         ...item,
         table, // IMPORTANTE: Garantir o campo table para o index
         _tableStore: true,
@@ -48,7 +48,7 @@ class TableStore {
       }));
 
       console.log(`💾 [TableStore] Salvando ${recordsToSave.length} novos registros em lote...`);
-      const savedCount = await LocalDB.bulkSave(recordsToSave);
+      const savedCount = await SQLiteStore.bulkSave(recordsToSave);
 
       console.log(`✅ [TableStore] SET concluído em '${table}' (${savedCount}/${items.length} salvos)`);
       return savedCount;
@@ -68,7 +68,7 @@ class TableStore {
     try {
       console.log(`📖 [TableStore] GET em '${table}'`);
 
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
       const items = records.map(r => r.payload);
 
       console.log(`✅ [TableStore] GET concluído em '${table}' (${items.length} registros)`);
@@ -90,7 +90,7 @@ class TableStore {
     try {
       console.log(`🔍 [TableStore] GET BY ID em '${table}' (id: ${id})`);
 
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
       const record = records.find(r => r.payload.id === id);
 
       if (record) {
@@ -139,7 +139,7 @@ class TableStore {
     try {
       console.log(`🚀 [TableStore] FIND QUERY (Index) em '${table}'`, selector);
 
-      const records = await LocalDB.find(table, selector);
+      const records = await SQLiteStore.find(table, selector);
       const items = records.map(r => r.payload);
 
       console.log(`✅ [TableStore] FIND QUERY concluído (${items.length} encontrados)`);
@@ -163,7 +163,7 @@ class TableStore {
       console.log(`✏️ [TableStore] UPDATE em '${table}' (id: ${id})`);
 
       // Busca o registro local
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
       const record = records.find(r => r.payload.id === id);
 
       if (!record) {
@@ -181,7 +181,7 @@ class TableStore {
       };
 
       // Salva o registro atualizado
-      const saved = await LocalDB.save(table, updated);
+      const saved = await SQLiteStore.save(table, updated);
 
       console.log(`✅ [TableStore] UPDATE concluído em '${table}'`);
       return saved.payload;
@@ -203,7 +203,7 @@ class TableStore {
       console.log(`🗑️ [TableStore] REMOVE em '${table}' (id: ${id})`);
 
       // Busca o registro local
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
       const record = records.find(r => r.payload.id === id);
 
       if (!record) {
@@ -212,7 +212,7 @@ class TableStore {
       }
 
       // Remove o registro
-      await LocalDB.delete(record._id);
+      await SQLiteStore.delete(record._id);
 
       console.log(`✅ [TableStore] REMOVE concluído em '${table}'`);
       return true;
@@ -232,12 +232,12 @@ class TableStore {
     try {
       console.log(`🗑️ [TableStore] CLEAR em '${table}'`);
 
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
       let removedCount = 0;
 
       for (const record of records) {
         try {
-          await LocalDB.delete(record._id);
+          await SQLiteStore.delete(record._id);
           removedCount++;
         } catch (error) {
           console.error(`❌ [TableStore] Erro ao remover registro:`, error);
@@ -260,7 +260,7 @@ class TableStore {
    */
   static async count(table: string): Promise<number> {
     try {
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
       return records.length;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no COUNT de '${table}':`, error);
@@ -297,7 +297,7 @@ class TableStore {
     table: string;
   }> {
     try {
-      const records = await LocalDB.getAll(table);
+      const records = await SQLiteStore.getAll(table);
 
       // Encontra o último sync
       let lastSync: string | null = null;
@@ -392,3 +392,4 @@ class TableStore {
 }
 
 export default TableStore;
+

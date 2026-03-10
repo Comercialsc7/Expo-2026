@@ -276,7 +276,7 @@ function AutoSync() {
 ### 2. Salvar Pedido Offline
 
 ```typescript
-import LocalDB from '@/lib/LocalDB';
+import SQLiteStore from '@/lib/SQLiteStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useSyncService } from '@/hooks/useSyncService';
 
@@ -284,7 +284,7 @@ async function saveOrder(order: Order) {
   const isOnline = useOnlineStatus();
 
   // Salvar localmente
-  await LocalDB.save('orders', {
+  await SQLiteStore.save('orders', {
     ...order,
     _synced: false,  // Marcar como não sincronizado
   });
@@ -325,7 +325,7 @@ function SyncButton() {
 
   useEffect(() => {
     async function checkUnsynced() {
-      const orders = await LocalDB.getAll('orders');
+      const orders = await SQLiteStore.getAll('orders');
       const unsynced = orders.filter(o => !o.payload._synced);
       setUnsyncedCount(unsynced.length);
     }
@@ -390,7 +390,7 @@ const { data, error } = await supabase
   .gte('created_at', sevenDaysAgo.toISOString());
 
 for (const order of data || []) {
-  await LocalDB.save('orders', { ...order, _synced: true });
+  await SQLiteStore.save('orders', { ...order, _synced: true });
 }
 ```
 
@@ -404,7 +404,7 @@ const { data } = await supabase
   .gt('stock', 0);
 
 for (const product of data || []) {
-  await LocalDB.save('products', { ...product, _synced: true });
+  await SQLiteStore.save('products', { ...product, _synced: true });
 }
 ```
 
