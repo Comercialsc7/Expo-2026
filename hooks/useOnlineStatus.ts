@@ -1,22 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
-import SyncService from '../lib/SyncService';
-
-const OFFLINE_SYNC_TABLES = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'relacao_prazo'];
 
 export function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(true);
   const previousOnlineState = useRef(true);
-
-  const runAutoSync = async () => {
-    try {
-      await SyncService.upload();
-      await SyncService.download({ tables: OFFLINE_SYNC_TABLES });
-      console.log('✅ Auto-sync concluído com sucesso');
-    } catch (error) {
-      console.error('❌ Erro no auto-sync:', error);
-    }
-  };
 
   const checkNativeConnectivity = async (): Promise<boolean> => {
     try {
@@ -44,13 +31,8 @@ export function useOnlineStatus() {
 
   useEffect(() => {
     const handleOnline = async () => {
-      console.log('✅ Conexão restabelecida - executando auto-sync');
+      console.log('✅ Conexão restabelecida');
       setIsOnline(true);
-
-      // Só sincroniza se estava offline antes
-      if (!previousOnlineState.current) {
-        await runAutoSync();
-      }
 
       previousOnlineState.current = true;
     };

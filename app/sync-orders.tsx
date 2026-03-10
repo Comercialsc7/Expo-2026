@@ -297,7 +297,7 @@ export default function SyncOrdersScreen() {
   const handleSyncDownload = useCallback(async () => {
     try {
       // Download completo dos dados necessários para operação offline
-      await download(syncTables);
+      await download(syncTables, 60000);
 
       // Espelha também em SQLite para telas sqlite-first
       for (const table of syncTables) {

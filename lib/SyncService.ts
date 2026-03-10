@@ -367,7 +367,7 @@ export class SyncService {
       }
 
       const { tables } = config;
-      const timeoutMs = config.downloadTimeoutMs ?? 15000;
+      const timeoutMs = config.downloadTimeoutMs ?? 60000;
       const total = tables.length;
       let processed = 0;
 
@@ -567,7 +567,7 @@ export class SyncService {
     }
   }
 
-  static async downloadTable(table: string, fullRefresh = false, timeoutMs: number = 15000): Promise<number> {
+  static async downloadTable(table: string, fullRefresh = false, timeoutMs: number = 60000): Promise<number> {
     try {
       const downloadTimestamp = new Date().toISOString();
       const syncMeta = fullRefresh ? null : await this.getSyncMeta(table);

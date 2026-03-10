@@ -10,9 +10,9 @@ interface UseSyncServiceResult {
   lastSync: Date | null;
   sync: (tables: string[]) => Promise<void>;
   upload: () => Promise<void>;
-  download: (tables: string[]) => Promise<void>;
+  download: (tables: string[], downloadTimeoutMs?: number) => Promise<void>;
   uploadTable: (table: string) => Promise<void>;
-  downloadTable: (table: string, fullRefresh?: boolean) => Promise<void>;
+  downloadTable: (table: string, fullRefresh?: boolean, timeoutMs?: number) => Promise<void>;
 }
 
 export function useSyncService(): UseSyncServiceResult {
@@ -88,10 +88,10 @@ export function useSyncService(): UseSyncServiceResult {
     }
   }, []);
 
-  const download = useCallback(async (tables: string[]) => {
+  const download = useCallback(async (tables: string[], downloadTimeoutMs = 60000) => {
     try {
       setError(null);
-      const config: SyncConfig = { tables };
+      const config: SyncConfig = { tables, downloadTimeoutMs };
       await SyncService.download(config);
     } catch (err) {
       setError(err as Error);
@@ -114,12 +114,12 @@ export function useSyncService(): UseSyncServiceResult {
     }
   }, []);
 
-  const downloadTable = useCallback(async (table: string, fullRefresh = false) => {
+  const downloadTable = useCallback(async (table: string, fullRefresh = false, timeoutMs = 60000) => {
     try {
       setError(null);
       setSyncing(true);
       setMessage(`Baixando dados de ${table}...`);
-      await SyncService.downloadTable(table, fullRefresh);
+      await SyncService.downloadTable(table, fullRefresh, timeoutMs);
       setSyncing(false);
       setMessage('Download concluído');
     } catch (err) {
