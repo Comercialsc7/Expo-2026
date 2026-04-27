@@ -455,7 +455,7 @@ export default function OrdersScreen() {
             <Image
               source={typeof banners[currentBanner].image === 'string' ? { uri: banners[currentBanner].image } : banners[currentBanner].image}
               style={[styles.bannerImage, { width: screenWidth }]}
-              resizeMode="contain"
+              resizeMode="cover"
             />
             <View style={styles.bannerIndicators}>
               {banners.map((_, index) => (
