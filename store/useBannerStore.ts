@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-
 export interface Banner {
   id: number;
   title: string;
@@ -27,7 +25,7 @@ export const useBannerStore = create<BannerStore>((set) => ({
       title: "Promoção Especial",
       subtitle: "Até 30% de desconto em bebidas",
       backgroundColor: "#FF6B6B",
-      image: `${SUPABASE_URL}/storage/v1/object/public/bunners/girosorte.gif`,
+      image: 'https://wuappvtbbjzdtgrcenwk.supabase.co/storage/v1/object/public/Comprapremiada/girosorte.gif',
       order: 0
     },
     {
@@ -35,7 +33,7 @@ export const useBannerStore = create<BannerStore>((set) => ({
       title: "Novos Produtos",
       subtitle: "Confira os lançamentos",
       backgroundColor: "#4ECDC4",
-      image: `${SUPABASE_URL}/storage/v1/object/public/bunners/comprapremiada.gif`,
+      image: 'https://wuappvtbbjzdtgrcenwk.supabase.co/storage/v1/object/public/Comprapremiada/arte_roleta_sorte.jpg',
       order: 1
     },
   ],
