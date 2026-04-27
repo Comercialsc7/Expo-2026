@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import SQLiteStore from './SQLiteStore';
 import { Platform } from 'react-native';
 import OfflineMutationQueue from './OfflineMutationQueue';
+import { debugLog } from './logger';
 
 /**
  * SmartRequest - Helper inteligente para requisições
@@ -35,7 +36,7 @@ class SmartRequest {
 
     if (online) {
       try {
-        console.log(`📡 [SmartRequest] INSERT online em '${table}'`);
+        debugLog(`📡 [SmartRequest] INSERT online em '${table}'`);
 
         const { data, error } = await supabase
           .from(table)
@@ -48,7 +49,7 @@ class SmartRequest {
           throw error;
         }
 
-        console.log(`✅ [SmartRequest] INSERT concluído em '${table}'`);
+        debugLog(`✅ [SmartRequest] INSERT concluído em '${table}'`);
         return data;
       } catch (error) {
         // Se falhar online, tenta salvar offline
@@ -64,7 +65,7 @@ class SmartRequest {
    * INSERT Offline - Salva no PouchDB como pendência
    */
   private static async insertOffline(table: string, payload: any): Promise<any> {
-    console.log(`💾 [SmartRequest] INSERT offline em '${table}'`);
+    debugLog(`💾 [SmartRequest] INSERT offline em '${table}'`);
 
     const record = {
       ...payload,
@@ -82,7 +83,7 @@ class SmartRequest {
       { data: payload },
       opKey
     );
-    console.log(`✅ [SmartRequest] Salvo offline em '${table}' (será sincronizado depois)`);
+    debugLog(`✅ [SmartRequest] Salvo offline em '${table}' (será sincronizado depois)`);
 
     return saved.payload;
   }
@@ -110,7 +111,7 @@ class SmartRequest {
 
     if (online) {
       try {
-        console.log(`📡 [SmartRequest] SELECT online em '${table}'`);
+        debugLog(`📡 [SmartRequest] SELECT online em '${table}'`);
 
         let query = supabase.from(table).select(options?.select || '*');
 
@@ -135,7 +136,7 @@ class SmartRequest {
           throw error;
         }
 
-        console.log(`✅ [SmartRequest] SELECT concluído em '${table}' (${data?.length || 0} registros)`);
+        debugLog(`✅ [SmartRequest] SELECT concluído em '${table}' (${data?.length || 0} registros)`);
         return data || [];
       } catch (error) {
         // Se falhar online, tenta buscar offline
@@ -159,7 +160,7 @@ class SmartRequest {
       order?: { column: string; ascending?: boolean };
     }
   ): Promise<any[]> {
-    console.log(`💾 [SmartRequest] SELECT offline em '${table}'`);
+    debugLog(`💾 [SmartRequest] SELECT offline em '${table}'`);
 
     try {
       let records = await SQLiteStore.getAll(table);
@@ -190,7 +191,7 @@ class SmartRequest {
         results = results.slice(0, options.limit);
       }
 
-      console.log(`✅ [SmartRequest] SELECT offline concluído em '${table}' (${results.length} registros)`);
+      debugLog(`✅ [SmartRequest] SELECT offline concluído em '${table}' (${results.length} registros)`);
       return results;
     } catch (error) {
       console.error(`❌ [SmartRequest] Erro ao buscar offline em '${table}':`, error);
@@ -214,7 +215,7 @@ class SmartRequest {
 
     if (online) {
       try {
-        console.log(`📡 [SmartRequest] UPDATE online em '${table}' (id: ${id})`);
+        debugLog(`📡 [SmartRequest] UPDATE online em '${table}' (id: ${id})`);
 
         const { data, error } = await supabase
           .from(table)
@@ -228,7 +229,7 @@ class SmartRequest {
           throw error;
         }
 
-        console.log(`✅ [SmartRequest] UPDATE concluído em '${table}'`);
+        debugLog(`✅ [SmartRequest] UPDATE concluído em '${table}'`);
         return data;
       } catch (error) {
         console.warn(`⚠️ [SmartRequest] Falha online, salvando offline em '${table}'`);
@@ -243,7 +244,7 @@ class SmartRequest {
    * UPDATE Offline - Salva no PouchDB como pendência
    */
   private static async updateOffline(table: string, id: string, payload: any): Promise<any> {
-    console.log(`💾 [SmartRequest] UPDATE offline em '${table}' (id: ${id})`);
+    debugLog(`💾 [SmartRequest] UPDATE offline em '${table}' (id: ${id})`);
 
     const record = {
       ...payload,
@@ -264,7 +265,7 @@ class SmartRequest {
       },
       `${table}:update:id:${id}`
     );
-    console.log(`✅ [SmartRequest] Atualização salva offline em '${table}' (será sincronizado depois)`);
+    debugLog(`✅ [SmartRequest] Atualização salva offline em '${table}' (será sincronizado depois)`);
 
     return saved.payload;
   }
@@ -284,7 +285,7 @@ class SmartRequest {
 
     if (online) {
       try {
-        console.log(`📡 [SmartRequest] DELETE online em '${table}' (id: ${id})`);
+        debugLog(`📡 [SmartRequest] DELETE online em '${table}' (id: ${id})`);
 
         const { error } = await supabase
           .from(table)
@@ -296,7 +297,7 @@ class SmartRequest {
           throw error;
         }
 
-        console.log(`✅ [SmartRequest] DELETE concluído em '${table}'`);
+        debugLog(`✅ [SmartRequest] DELETE concluído em '${table}'`);
       } catch (error) {
         console.warn(`⚠️ [SmartRequest] Falha online, marcando para deletar offline em '${table}'`);
         await this.deleteOffline(table, id);
@@ -310,7 +311,7 @@ class SmartRequest {
    * DELETE Offline - Marca no PouchDB como pendência de exclusão
    */
   private static async deleteOffline(table: string, id: string): Promise<void> {
-    console.log(`💾 [SmartRequest] DELETE offline em '${table}' (id: ${id})`);
+    debugLog(`💾 [SmartRequest] DELETE offline em '${table}' (id: ${id})`);
 
     const record = {
       id,
@@ -329,7 +330,7 @@ class SmartRequest {
       },
       `${table}:delete:id:${id}`
     );
-    console.log(`✅ [SmartRequest] Exclusão marcada offline em '${table}' (será sincronizado depois)`);
+    debugLog(`✅ [SmartRequest] Exclusão marcada offline em '${table}' (será sincronizado depois)`);
   }
 
   /**
@@ -344,7 +345,7 @@ class SmartRequest {
 
     if (online) {
       try {
-        console.log(`📡 [SmartRequest] UPSERT online em '${table}'`);
+        debugLog(`📡 [SmartRequest] UPSERT online em '${table}'`);
 
         const { data, error } = await supabase
           .from(table)
@@ -357,7 +358,7 @@ class SmartRequest {
           throw error;
         }
 
-        console.log(`✅ [SmartRequest] UPSERT concluído em '${table}'`);
+        debugLog(`✅ [SmartRequest] UPSERT concluído em '${table}'`);
         return data;
       } catch (error) {
         console.warn(`⚠️ [SmartRequest] Falha online, salvando offline em '${table}'`);
@@ -372,7 +373,7 @@ class SmartRequest {
    * UPSERT Offline - Salva no PouchDB como pendência
    */
   private static async upsertOffline(table: string, payload: any): Promise<any> {
-    console.log(`💾 [SmartRequest] UPSERT offline em '${table}'`);
+    debugLog(`💾 [SmartRequest] UPSERT offline em '${table}'`);
 
     const record = {
       ...payload,
@@ -389,7 +390,7 @@ class SmartRequest {
       { data: payload },
       opKey
     );
-    console.log(`✅ [SmartRequest] Upsert salvo offline em '${table}' (será sincronizado depois)`);
+    debugLog(`✅ [SmartRequest] Upsert salvo offline em '${table}' (será sincronizado depois)`);
 
     return saved.payload;
   }

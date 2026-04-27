@@ -1,4 +1,5 @@
 import SQLiteStore from './SQLiteStore';
+import { debugLog } from './logger';
 
 /**
  * TableStore - Camada de abstração para gerenciar tabelas locais
@@ -24,12 +25,12 @@ class TableStore {
    */
   static async set(table: string, items: any[]): Promise<number> {
     try {
-      console.log(`📦 [TableStore] SET iniciado em '${table}' (${items.length} registros)`);
+      debugLog(`📦 [TableStore] SET iniciado em '${table}' (${items.length} registros)`);
 
       // Passo 1: Remover todos os registros antigos da tabela de uma vez
       const oldRecords = await SQLiteStore.getAll(table);
       if (oldRecords.length > 0) {
-        console.log(`🗑️ [TableStore] Removendo ${oldRecords.length} registros antigos em lote...`);
+        debugLog(`🗑️ [TableStore] Removendo ${oldRecords.length} registros antigos em lote...`);
         // Prepara os documentos para exclusão
         await SQLiteStore.bulkDelete(oldRecords);
       }
@@ -47,10 +48,10 @@ class TableStore {
         updatedAt: timestamp,
       }));
 
-      console.log(`💾 [TableStore] Salvando ${recordsToSave.length} novos registros em lote...`);
+      debugLog(`💾 [TableStore] Salvando ${recordsToSave.length} novos registros em lote...`);
       const savedCount = await SQLiteStore.bulkSave(recordsToSave);
 
-      console.log(`✅ [TableStore] SET concluído em '${table}' (${savedCount}/${items.length} salvos)`);
+      debugLog(`✅ [TableStore] SET concluído em '${table}' (${savedCount}/${items.length} salvos)`);
       return savedCount;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no SET de '${table}':`, error);
@@ -66,12 +67,12 @@ class TableStore {
    */
   static async get(table: string): Promise<any[]> {
     try {
-      console.log(`📖 [TableStore] GET em '${table}'`);
+      debugLog(`📖 [TableStore] GET em '${table}'`);
 
       const records = await SQLiteStore.getAll(table);
       const items = records.map(r => r.payload);
 
-      console.log(`✅ [TableStore] GET concluído em '${table}' (${items.length} registros)`);
+      debugLog(`✅ [TableStore] GET concluído em '${table}' (${items.length} registros)`);
       return items;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no GET de '${table}':`, error);
@@ -88,17 +89,17 @@ class TableStore {
    */
   static async getById(table: string, id: string): Promise<any | null> {
     try {
-      console.log(`🔍 [TableStore] GET BY ID em '${table}' (id: ${id})`);
+      debugLog(`🔍 [TableStore] GET BY ID em '${table}' (id: ${id})`);
 
       const records = await SQLiteStore.getAll(table);
       const record = records.find(r => r.payload.id === id);
 
       if (record) {
-        console.log(`✅ [TableStore] Registro encontrado em '${table}'`);
+        debugLog(`✅ [TableStore] Registro encontrado em '${table}'`);
         return record.payload;
       }
 
-      console.log(`⚠️ [TableStore] Registro não encontrado em '${table}'`);
+      debugLog(`⚠️ [TableStore] Registro não encontrado em '${table}'`);
       return null;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no GET BY ID de '${table}':`, error);
@@ -115,12 +116,12 @@ class TableStore {
    */
   static async find(table: string, predicate: (item: any) => boolean): Promise<any[]> {
     try {
-      console.log(`🔍 [TableStore] FIND (Memory) em '${table}'`);
+      debugLog(`🔍 [TableStore] FIND (Memory) em '${table}'`);
 
       const items = await this.get(table);
       const filtered = items.filter(predicate);
 
-      console.log(`✅ [TableStore] FIND concluído em '${table}' (${filtered.length} encontrados)`);
+      debugLog(`✅ [TableStore] FIND concluído em '${table}' (${filtered.length} encontrados)`);
       return filtered;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no FIND de '${table}':`, error);
@@ -137,12 +138,12 @@ class TableStore {
    */
   static async findQuery(table: string, selector: any): Promise<any[]> {
     try {
-      console.log(`🚀 [TableStore] FIND QUERY (Index) em '${table}'`, selector);
+      debugLog(`🚀 [TableStore] FIND QUERY (Index) em '${table}'`, selector);
 
       const records = await SQLiteStore.find(table, selector);
       const items = records.map(r => r.payload);
 
-      console.log(`✅ [TableStore] FIND QUERY concluído (${items.length} encontrados)`);
+      debugLog(`✅ [TableStore] FIND QUERY concluído (${items.length} encontrados)`);
       return items;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no FIND QUERY de '${table}':`, error);
@@ -160,14 +161,14 @@ class TableStore {
    */
   static async update(table: string, id: string, changes: any): Promise<any | null> {
     try {
-      console.log(`✏️ [TableStore] UPDATE em '${table}' (id: ${id})`);
+      debugLog(`✏️ [TableStore] UPDATE em '${table}' (id: ${id})`);
 
       // Busca o registro local
       const records = await SQLiteStore.getAll(table);
       const record = records.find(r => r.payload.id === id);
 
       if (!record) {
-        console.log(`⚠️ [TableStore] Registro não encontrado em '${table}'`);
+        debugLog(`⚠️ [TableStore] Registro não encontrado em '${table}'`);
         return null;
       }
 
@@ -183,7 +184,7 @@ class TableStore {
       // Salva o registro atualizado
       const saved = await SQLiteStore.save(table, updated);
 
-      console.log(`✅ [TableStore] UPDATE concluído em '${table}'`);
+      debugLog(`✅ [TableStore] UPDATE concluído em '${table}'`);
       return saved.payload;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no UPDATE de '${table}':`, error);
@@ -200,21 +201,21 @@ class TableStore {
    */
   static async remove(table: string, id: string): Promise<boolean> {
     try {
-      console.log(`🗑️ [TableStore] REMOVE em '${table}' (id: ${id})`);
+      debugLog(`🗑️ [TableStore] REMOVE em '${table}' (id: ${id})`);
 
       // Busca o registro local
       const records = await SQLiteStore.getAll(table);
       const record = records.find(r => r.payload.id === id);
 
       if (!record) {
-        console.log(`⚠️ [TableStore] Registro não encontrado em '${table}'`);
+        debugLog(`⚠️ [TableStore] Registro não encontrado em '${table}'`);
         return false;
       }
 
       // Remove o registro
       await SQLiteStore.delete(record._id);
 
-      console.log(`✅ [TableStore] REMOVE concluído em '${table}'`);
+      debugLog(`✅ [TableStore] REMOVE concluído em '${table}'`);
       return true;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no REMOVE de '${table}':`, error);
@@ -230,7 +231,7 @@ class TableStore {
    */
   static async clear(table: string): Promise<number> {
     try {
-      console.log(`🗑️ [TableStore] CLEAR em '${table}'`);
+      debugLog(`🗑️ [TableStore] CLEAR em '${table}'`);
 
       const records = await SQLiteStore.getAll(table);
       let removedCount = 0;
@@ -244,7 +245,7 @@ class TableStore {
         }
       }
 
-      console.log(`✅ [TableStore] CLEAR concluído em '${table}' (${removedCount} removidos)`);
+      debugLog(`✅ [TableStore] CLEAR concluído em '${table}' (${removedCount} removidos)`);
       return removedCount;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no CLEAR de '${table}':`, error);
@@ -335,7 +336,7 @@ class TableStore {
     updates: Array<{ id: string; changes: any }>
   ): Promise<number> {
     try {
-      console.log(`✏️ [TableStore] BATCH UPDATE em '${table}' (${updates.length} registros)`);
+      debugLog(`✏️ [TableStore] BATCH UPDATE em '${table}' (${updates.length} registros)`);
 
       let updatedCount = 0;
       for (const { id, changes } of updates) {
@@ -345,7 +346,7 @@ class TableStore {
         }
       }
 
-      console.log(`✅ [TableStore] BATCH UPDATE concluído (${updatedCount}/${updates.length})`);
+      debugLog(`✅ [TableStore] BATCH UPDATE concluído (${updatedCount}/${updates.length})`);
       return updatedCount;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no BATCH UPDATE de '${table}':`, error);
@@ -367,7 +368,7 @@ class TableStore {
     fields: string[]
   ): Promise<any[]> {
     try {
-      console.log(`🔍 [TableStore] SEARCH em '${table}' (termo: "${searchTerm}")`);
+      debugLog(`🔍 [TableStore] SEARCH em '${table}' (termo: "${searchTerm}")`);
 
       const items = await this.get(table);
       const term = searchTerm.toLowerCase();
@@ -382,7 +383,7 @@ class TableStore {
         return false;
       });
 
-      console.log(`✅ [TableStore] SEARCH concluído (${results.length} encontrados)`);
+      debugLog(`✅ [TableStore] SEARCH concluído (${results.length} encontrados)`);
       return results;
     } catch (error) {
       console.error(`❌ [TableStore] Erro no SEARCH de '${table}':`, error);

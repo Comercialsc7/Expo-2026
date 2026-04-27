@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import TableStore from '../lib/TableStore';
 import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 import OfflineMutationQueue from '../lib/OfflineMutationQueue';
+import { debugLog } from '../lib/logger';
 
 export interface Product {
   id: string;
@@ -63,10 +64,10 @@ export const useProducts = () => {
       if (countError) {
         console.warn('Erro ao contar produtos:', countError);
       }
-      console.log(`Total esperado de produtos no banco: ${count}`);
+      debugLog(`Total esperado de produtos no banco: ${count}`);
 
       while (hasMore) {
-        console.log(`🔄 Buscando lote ${Math.floor(offset / batchSize) + 1} (produtos ${offset + 1} a ${offset + batchSize})...`);
+        debugLog(`🔄 Buscando lote ${Math.floor(offset / batchSize) + 1} (produtos ${offset + 1} a ${offset + batchSize})...`);
         const { data, error } = await supabase
           .from('products')
           .select('*')
@@ -78,7 +79,7 @@ export const useProducts = () => {
         }
         if (data && data.length > 0) {
           allProducts = [...allProducts, ...data];
-          console.log(`✅ Lote carregado: ${data.length} produtos (Total acumulado: ${allProducts.length})`);
+          debugLog(`✅ Lote carregado: ${data.length} produtos (Total acumulado: ${allProducts.length})`);
           if (data.length < batchSize) {
             hasMore = false;
           } else {
