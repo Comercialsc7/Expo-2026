@@ -34,22 +34,23 @@ const cacheFirst = async (request) => {
 
 // Estratégia: Network First, fallback para Cache
 const networkFirst = async (request) => {
-  const cache = await caches.open(RUNTIME_CACHE);
+  const runtimeCache = await caches.open(RUNTIME_CACHE);
+  const staticCache = await caches.open(CACHE_NAME);
   try {
     const response = await fetch(request);
     if (response.status === 200) {
-      cache.put(request, response.clone());
+      runtimeCache.put(request, response.clone());
     }
     return response;
   } catch (error) {
-    const cached = await cache.match(request);
+    const cached = await runtimeCache.match(request);
     if (cached) {
       return cached;
     }
 
     // Se for uma requisição de navegação e não temos cache, mostrar página offline
     if (request.mode === 'navigate') {
-      const offlinePage = await cache.match('/offline.html');
+      const offlinePage = await runtimeCache.match('/offline.html') || await staticCache.match('/offline.html');
       if (offlinePage) {
         return offlinePage;
       }
