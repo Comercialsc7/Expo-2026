@@ -67,8 +67,10 @@ export default function OrderSummaryScreen() {
       total: total,
       discount: desconto,
       sellerCode: sellerCode || '',
+      email: email,
+      enviado: false,
       spinPrize: results.length > 0 ? {
-        type: 'product' as const,
+        type: results[0].prize === 'Não foi dessa vez' ? 'no_prize' as const : 'product' as const,
         description: results[0].prize,
         photo: results[0].photoUri
       } : undefined

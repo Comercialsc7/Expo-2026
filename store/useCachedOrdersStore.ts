@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { OrderItem, Client, PaymentTerm } from './useOrderStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import SQLiteStore from '../lib/SQLiteStore';
 
 export interface CachedOrder {
   id: string;
@@ -31,6 +32,7 @@ interface CachedOrdersState {
   clearCachedOrders: () => void;
   getOrderById: (id: string) => CachedOrder | undefined;
   removeCachedOrder: (orderId: string) => void;
+  updateCachedOrder: (orderId: string, updater: (order: CachedOrder) => CachedOrder) => void;
   setHasHydrated: (state: boolean) => void;
 }
 
@@ -65,12 +67,35 @@ export const useCachedOrdersStore = create<CachedOrdersState>()(
       addCachedOrder: (order) => set((state) => ({
         cachedOrders: [...state.cachedOrders, order],
       })),
-      clearCachedOrders: () => set({ cachedOrders: [] }),
+      clearCachedOrders: () => {
+        set({ cachedOrders: [] });
+        void SQLiteStore.clear('cached_orders');
+      },
       getOrderById: (id) => get().cachedOrders.find(order => order.id === id),
       removeCachedOrder: (orderId) => set((state) => {
         console.log('Cached orders antes da remoção (' + orderId + '):', state.cachedOrders.length);
         const updatedOrders = state.cachedOrders.filter(order => order.id !== orderId);
         console.log('Cached orders depois da remoção (' + orderId + '):', updatedOrders.length);
+        void SQLiteStore.remove('cached_orders', orderId);
+        return { cachedOrders: updatedOrders };
+      }),
+      updateCachedOrder: (orderId, updater) => set((state) => {
+        const updatedOrders = state.cachedOrders.map((order) => {
+          if (order.id !== orderId) {
+            return order;
+          }
+
+          return updater(order);
+        });
+
+        const updatedOrder = updatedOrders.find((order) => order.id === orderId);
+        if (updatedOrder) {
+          void SQLiteStore.save('cached_orders', {
+            ...updatedOrder,
+            _id: updatedOrder.id,
+          });
+        }
+
         return { cachedOrders: updatedOrders };
       }),
       setHasHydrated: (state) => {
@@ -94,3 +119,16 @@ export const useCachedOrdersStore = create<CachedOrdersState>()(
     }
   )
 );
+
+useCachedOrdersStore.subscribe((state) => {
+  if (state.cachedOrders.length === 0) {
+    return;
+  }
+
+  for (const order of state.cachedOrders) {
+    void SQLiteStore.save('cached_orders', {
+      ...order,
+      _id: order.id,
+    });
+  }
+});
