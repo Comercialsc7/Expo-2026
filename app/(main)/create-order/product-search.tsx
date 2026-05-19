@@ -54,19 +54,18 @@ export default function ProductSearch() {
   }
 
   const handleSelectProduct = (product: Product) => {
-    addItem({
-      id: product.id,
-      code: product.code,
-      name: product.name,
-      box: product.box_size ? `CX ${product.box_size} unids.` : '',
-      price: product.price,
-      discount: 0, // TODO: Adicionar campo de desconto na tabela de produtos
-      image: product.image_url,
-      quantity: 1,
-      isAccelerator: product.is_accelerator,
-      paymentTerm: selectedPaymentTerm
+    router.push({
+      pathname: '/(main)/create-order/product-detail',
+      params: {
+        id: product.id,
+        name: product.name,
+        code: product.code,
+        price: product.price.toFixed(2),
+        box_size: product.box_size,
+        is_accelerator: product.is_accelerator ? 'true' : 'false',
+        image_url: product.image_url,
+      }
     });
-    router.push('/(main)/create-order');
   };
 
   return (
