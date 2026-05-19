@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-// Polyfills para PouchDB e outras libs que dependem de globais do Node/Browser antigo
+// Polyfills para libs web que ainda dependem de globais do Node/Browser antigo
 if (typeof global === 'undefined') {
     window.global = window;
 }

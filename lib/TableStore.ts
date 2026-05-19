@@ -4,7 +4,7 @@ import { debugLog } from './logger';
 /**
  * TableStore - Camada de abstração para gerenciar tabelas locais
  *
- * Permite armazenar e gerenciar tabelas completas no PouchDB
+ * Permite armazenar e gerenciar tabelas completas no armazenamento local
  * Ideal para cadastros que precisam estar disponíveis offline:
  * - Produtos
  * - Clientes
@@ -36,7 +36,7 @@ class TableStore {
       }
 
       // Passo 2: Preparar e Inserir novos registros em lote
-      // PouchDB aceita o UUID no campo _id. Se o item já tem id, use-o como _id ou prefixe para evitar colisão
+      // Usa o ID do item como chave local quando disponível para manter estabilidade entre syncs.
       const timestamp = new Date().toISOString();
       const recordsToSave = items.map(item => ({
         _id: item.id || undefined, // Deixa o SQLiteStore gerar se não tiver, ou usa o ID do item

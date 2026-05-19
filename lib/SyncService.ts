@@ -198,7 +198,7 @@ export class SyncService {
   }
 
   /**
-   * Busca metadados de sincronização do PouchDB
+   * Busca metadados de sincronização do armazenamento local.
    */
   private static async getSyncMeta(table: string): Promise<{
     last_upload_at: string | null;
@@ -234,7 +234,7 @@ export class SyncService {
   }
 
   /**
-   * Atualiza metadados de sincronização no PouchDB
+   * Atualiza metadados de sincronização no armazenamento local.
    */
   private static async updateSyncMeta(
     table: string,
