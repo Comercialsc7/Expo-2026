@@ -6,6 +6,7 @@ import { useNavigation } from '../../../hooks/useNavigation';
 import { useOrderStore, OrderItem } from '../../../store/useOrderStore';
 import { useCachedOrdersStore } from '../../../store/useCachedOrdersStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { calculateSpins } from '../../../lib/spinRewards';
 
 interface SpinResult {
   prize: string;
@@ -28,7 +29,7 @@ export default function OrderSummaryScreen() {
   const itens = orderItems.length;
   const prazo = paymentTerm?.description || '0';
 
-  const girosGanhos = Math.floor(total / 3000);
+  const girosGanhos = calculateSpins(total);
   const girosRestantes = girosGanhos - results.length;
   const faltaGiro = 3000 - (total % 3000) || 0;
   const cuponsGanhos = Math.floor(total / 5000);

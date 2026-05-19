@@ -26,7 +26,7 @@ export default function SpinWheelScreen() {
   const [selectedPrize, setSelectedPrize] = useState<Prize | null>(null);
   const [loading, setLoading] = useState(false);
   const params = useLocalSearchParams();
-  const girosDisponiveis = Number(params.girosDisponiveis) || 0;
+  const girosDisponiveis = Math.min(5, Number(params.girosDisponiveis) || 0);
 
   const { addResult } = useSpinResultsStore();
 
