@@ -8,10 +8,9 @@ import { optimizeImage } from '../../../lib/imageUtils';
 import { supabase } from '../../../lib/supabase';
 
 const premios = [
-  'Fritadeira Inox',
-  'Headphone JBL 520BT',
+  'Kit Churrasco 14 peças Tramontina',
   'JBL Go Essential',
-  'Multiprocessador Alimentos 4 em 1',
+  'Jogo de Jantar 20 peças Tramontina',
   'Não foi dessa vez'
 ];
 
