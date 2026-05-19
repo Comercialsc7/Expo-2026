@@ -143,5 +143,3 @@ export function useSyncService(): UseSyncServiceResult {
     downloadTable,
   };
 }
-
-export default useSyncService;

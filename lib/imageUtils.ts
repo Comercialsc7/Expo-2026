@@ -1,5 +1,4 @@
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Platform } from 'react-native';
 
 interface ImageOptimizationOptions {
   maxWidth?: number;
@@ -18,6 +17,9 @@ export const optimizeImage = async (
     quality = 0.8,
     format = 'jpeg'
   } = options;
+  const saveFormat = format === 'png'
+    ? ImageManipulator.SaveFormat.PNG
+    : ImageManipulator.SaveFormat.JPEG;
 
   try {
     const manipResult = await ImageManipulator.manipulateAsync(
@@ -32,7 +34,7 @@ export const optimizeImage = async (
       ],
       {
         compress: quality,
-        format: ImageManipulator.SaveFormat[format.toUpperCase()],
+        format: saveFormat,
       }
     );
 
@@ -42,30 +44,3 @@ export const optimizeImage = async (
     return uri; // Retorna a URI original em caso de erro
   }
 };
-
-export const getImageDimensions = async (uri: string): Promise<{ width: number; height: number }> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      resolve({
-        width: img.width,
-        height: img.height
-      });
-    };
-    img.onerror = reject;
-    img.src = uri;
-  });
-};
-
-export const calculateAspectRatioFit = (
-  srcWidth: number,
-  srcHeight: number,
-  maxWidth: number,
-  maxHeight: number
-): { width: number; height: number } => {
-  const ratio = Math.min(maxWidth / srcWidth, maxHeight / srcHeight);
-  return {
-    width: srcWidth * ratio,
-    height: srcHeight * ratio
-  };
-}; 
