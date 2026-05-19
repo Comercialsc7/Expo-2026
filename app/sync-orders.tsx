@@ -1,14 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Modal, Image, ViewStyle, TextStyle, ImageStyle } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Modal, Image } from 'react-native';
 import { useNavigation } from '../hooks/useNavigation';
 import { useCachedOrdersStore, CachedOrder } from '../store/useCachedOrdersStore';
-import { supabase } from '../lib/supabase';
-import { decode } from 'base64-arraybuffer';
 import { OrderItem } from './components/OrderItem';
 import { OrderDetailsModal } from './components/OrderDetailsModal';
 import { styles } from './styles/_sync-orders.styles';
 import { useSyncService } from '../hooks/useSyncService';
-import SQLiteStore from '../lib/SQLiteStore';
 import { ConnectionBadge } from '../components/shared/ConnectionBadge';
 import OfflineMutationQueue from '../lib/OfflineMutationQueue';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -21,12 +18,9 @@ export default function SyncOrdersScreen() {
   const syncTables = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'relacao_prazo'];
 
   const { goBack } = useNavigation();
-  const { cachedOrders, clearCachedOrders, getOrderById, _hasHydrated, removeCachedOrder } = useCachedOrdersStore();
-  const { syncing, progress, total, message, error: syncError, sync, upload, download, downloadTable } = useSyncService();
+  const { cachedOrders, _hasHydrated, removeCachedOrder } = useCachedOrdersStore();
+  const { syncing, progress, total, message, error: syncError, upload, download, downloadTable } = useSyncService();
   const isOnline = useOnlineStatus();
-  const [isSending, setIsSending] = useState(false);
-  const [isReceiving, setIsReceiving] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [selectedOrder, _setSelectedOrder] = useState<CachedOrder | null>(null);
   const [isDeleteConfirmModalVisible, setIsDeleteConfirmModalVisible] = useState(false);
   const [orderIdToDelete, setOrderIdToDelete] = useState<string | null>(null);
@@ -115,133 +109,6 @@ export default function SyncOrdersScreen() {
     setLastNoticeDismissAt(Date.now());
   }, []);
 
-  const handleSendData = useCallback(async () => {
-    try {
-      setIsSending(true);
-      setSyncStatus('idle');
-
-      if (cachedOrders.length === 0) {
-        Alert.alert('Nenhum pedido', 'Não há pedidos em cache para enviar.');
-        setIsSending(false);
-        return;
-      }
-
-      const sentIds: string[] = [];
-      for (const order of cachedOrders) {
-        if (sentOrders.includes(order.id)) {
-          // Ignora pedidos já enviados
-          continue;
-        }
-
-        let prizePhotoUrl: string | null = null;
-
-        // 1. Upload da imagem do prêmio, se existir
-        if (order.spinPrize?.photo) {
-          // Se for uma URI local (file://), converte para Blob
-          let blob = null;
-          try {
-            const response = await fetch(order.spinPrize.photo);
-            blob = await response.blob();
-          } catch (e) {
-            console.error('Erro ao converter foto em Blob:', e);
-            Alert.alert('Erro', `Falha ao processar a imagem do prêmio para o pedido ${order.id}.`);
-            throw e;
-          }
-          const fileName = `spin_prize_${order.id}_${Date.now()}.png`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('spinprizeimages')
-            .upload(fileName, blob, { contentType: 'image/png' });
-
-          if (uploadError) {
-            console.error('Erro ao fazer upload da imagem do prêmio:', uploadError);
-            Alert.alert('Erro', `Falha ao fazer upload da imagem do prêmio para o pedido ${order.id}.`);
-            throw uploadError;
-          }
-          // Use o método getPublicUrl do cliente Supabase quando disponível
-          try {
-            const publicUrlResult = supabase.storage.from('spinprizeimages').getPublicUrl(fileName);
-            // compatibiliza com retorno que pode estar em { data: { publicUrl } }
-            if (publicUrlResult && (publicUrlResult as any).data && (publicUrlResult as any).data.publicUrl) {
-              prizePhotoUrl = (publicUrlResult as any).data.publicUrl;
-            } else if ((publicUrlResult as any).publicUrl) {
-              prizePhotoUrl = (publicUrlResult as any).publicUrl;
-            } else {
-              // fallback para montar manualmente com variável de ambiente
-              const base = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-              prizePhotoUrl = `${base}/storage/v1/object/public/spinprizeimages/${fileName}`;
-            }
-          } catch (e) {
-            const base = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-            prizePhotoUrl = `${base}/storage/v1/object/public/spinprizeimages/${fileName}`;
-          }
-        }
-
-        // 2. Montar array de produtos
-        const produtos = order.items.map(item => ({
-          produto_id: item.code,
-          produto_nome: item.name,
-          quantidade: item.quantity,
-          preco_unitario: item.price,
-          desconto: item.discount,
-          embalagem: item.box,
-          acelerador: item.isAccelerator
-        }));
-
-        // NOVO: Verificar se o pedido já existe no banco
-        const { data: existing, error: checkError } = await supabase
-          .from('pedidos')
-          .select('pedido_id')
-          .eq('pedido_id', order.id)
-          .single();
-        if (checkError && checkError.code !== 'PGRST116') {
-          // PGRST116 = Not found, pode ignorar
-          console.error('Erro ao verificar pedido existente:', checkError);
-          continue;
-        }
-        if (existing) {
-          // Já existe, não insere de novo
-          console.log(`Pedido ${order.id} já existe no banco, pulando inserção.`);
-          sentIds.push(order.id);
-          continue;
-        }
-
-        // 3. Inserir o pedido na tabela 'pedidos'
-        const { error: insertError } = await supabase
-          .from('pedidos')
-          .insert({
-            pedido_id: order.id,
-            vendedor_codigo: order.sellerCode,
-            cliente_code: order.client.code,
-            cliente_nome: order.client.name,
-            email: order.email ? order.email : '',
-            produtos: produtos,
-            subtotal: order.subtotal,
-            desconto: order.discount,
-            total: order.total,
-            prazo_pagamento: order.paymentTerm?.description || '',
-            premio_imagem_url: prizePhotoUrl,
-            status_envio: 'pendente',
-          });
-
-        if (insertError) {
-          console.error('Erro ao inserir pedido:', insertError);
-          Alert.alert('Erro', `Falha ao salvar o pedido ${order.id} na tabela de pedidos.`);
-          throw insertError;
-        }
-        sentIds.push(order.id);
-      }
-      setSentOrders((prev) => [...prev, ...sentIds]);
-      setSyncStatus('success');
-      Alert.alert('Sucesso', 'Dados enviados com sucesso!');
-    } catch (error) {
-      setSyncStatus('error');
-      console.error('Erro geral ao enviar dados:', error);
-      Alert.alert('Erro', 'Falha ao enviar dados. Tente novamente.');
-    } finally {
-      setIsSending(false);
-    }
-  }, [cachedOrders, clearCachedOrders, sentOrders]);
-
   const handleDeleteOrder = useCallback((orderId: string) => {
     blurActiveElementOnWeb();
     console.log('handleDeleteOrder chamado para o pedido:', orderId);
@@ -266,23 +133,6 @@ export default function SyncOrdersScreen() {
     setOrderIdToDelete(null);
     setIsDeleteConfirmModalVisible(false);
   }, [blurActiveElementOnWeb]);
-
-  const handleReceiveData = useCallback(async () => {
-    try {
-      setIsReceiving(true);
-      setSyncStatus('idle');
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      setSyncStatus('success');
-      Alert.alert('Sucesso', 'Dados recebidos com sucesso!');
-    } catch (error) {
-      setSyncStatus('error');
-      Alert.alert('Erro', 'Falha ao receber dados. Tente novamente.');
-    } finally {
-      setIsReceiving(false);
-    }
-  }, []);
 
   const handleSyncUpload = useCallback(async () => {
     try {
@@ -334,7 +184,7 @@ export default function SyncOrdersScreen() {
   };
 
   const renderSyncStatus = () => {
-    if (!syncing && syncStatus === 'idle' && !syncError) return null;
+    if (!syncing && !syncError && !message) return null;
 
     return (
       <View style={styles.syncStatus}>
@@ -363,9 +213,9 @@ export default function SyncOrdersScreen() {
             Erro: {syncError.message}
           </Text>
         )}
-        {!syncing && syncStatus === 'success' && (
+        {!syncing && !syncError && !!message && (
           <Text style={[styles.syncStatusText, styles.successText]}>
-            Sincronização concluída!
+            {message}
           </Text>
         )}
       </View>
