@@ -44,14 +44,20 @@ export default function OrderSummaryScreen() {
 
     let sellerCode: string | undefined;
     try {
-      const codigosStr = await AsyncStorage.getItem('codigosRepresentante');
-      if (codigosStr) {
-        const codigosArray = JSON.parse(codigosStr);
-        if (codigosArray.length > 0) {
-          sellerCode = codigosArray[codigosArray.length - 1];
-          console.log('Código do vendedor obtido do AsyncStorage para caching:', sellerCode);
+      const currentRepresentativeCode = await AsyncStorage.getItem('representativeCodeToStore');
+      if (currentRepresentativeCode) {
+        sellerCode = String(currentRepresentativeCode);
+      } else {
+        const codigosStr = await AsyncStorage.getItem('codigosRepresentante');
+        if (codigosStr) {
+          const codigosArray = JSON.parse(codigosStr);
+          if (codigosArray.length > 0) {
+            sellerCode = String(codigosArray[codigosArray.length - 1]);
+          }
         }
       }
+
+      console.log('Código do vendedor obtido do AsyncStorage para caching:', sellerCode);
     } catch (error) {
       console.error('Erro ao buscar código do representante para o pedido cacheado:', error);
     }

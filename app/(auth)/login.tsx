@@ -144,6 +144,19 @@ export default function Login() {
     }
   };
 
+  const saveRepresentativeHistory = async (representativeCode: string) => {
+    const codigosSalvosStr = await AsyncStorage.getItem('codigosRepresentante');
+    const codigosArray = codigosSalvosStr ? JSON.parse(codigosSalvosStr) : [];
+    const normalizedCode = String(representativeCode);
+
+    const updatedHistory = [
+      ...codigosArray.filter((codigo: string) => String(codigo) !== normalizedCode),
+      normalizedCode,
+    ];
+
+    await AsyncStorage.setItem('codigosRepresentante', JSON.stringify(updatedHistory));
+  };
+
   const handleLogin = async () => {
     console.log('Selected Team:', selectedTeam);
     console.log('Code:', code);
@@ -203,19 +216,13 @@ export default function Login() {
 
         // SUCESSO ONLINE
         const foundUser = userData[0];
+        const representativeCode = String(foundUser.user_id);
 
         // Salva persistência
         await AsyncStorage.setItem('selectedTeamCode', String(selectedTeam));
-        await AsyncStorage.setItem('representativeCodeToStore', foundUser.user_id);
+        await AsyncStorage.setItem('representativeCodeToStore', representativeCode);
         await AsyncStorage.setItem('representanteNome', foundUser.name);
-
-        // Salva histórico de códigos
-        const codigosSalvosStr = await AsyncStorage.getItem('codigosRepresentante');
-        let codigosArray = codigosSalvosStr ? JSON.parse(codigosSalvosStr) : [];
-        if (!codigosArray.includes(foundUser.user_id)) {
-          codigosArray.push(foundUser.user_id);
-          await AsyncStorage.setItem('codigosRepresentante', JSON.stringify(codigosArray));
-        }
+        await saveRepresentativeHistory(representativeCode);
 
         // Cachear usuário para futuro offline
         await TableStore.set('users', userData);
@@ -259,9 +266,11 @@ export default function Login() {
         );
 
         if (foundUser) {
+          const representativeCode = String(foundUser.user_id);
           await AsyncStorage.setItem('selectedTeamCode', String(selectedTeam));
-          await AsyncStorage.setItem('representativeCodeToStore', foundUser.user_id);
+          await AsyncStorage.setItem('representativeCodeToStore', representativeCode);
           await AsyncStorage.setItem('representanteNome', foundUser.name);
+          await saveRepresentativeHistory(representativeCode);
 
           console.log('✅ Login Offline Sucesso');
           router.push('/(app)/orders');
