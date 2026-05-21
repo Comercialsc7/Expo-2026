@@ -7,6 +7,7 @@ import SQLiteStore from '../lib/SQLiteStore';
 
 export interface CachedOrder {
   id: string;
+  shortOrderNumber?: string;
   items: OrderItem[];
   client: Client;
   paymentTerm: PaymentTerm;

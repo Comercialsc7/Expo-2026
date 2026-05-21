@@ -58,6 +58,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
           <ScrollView style={styles.modalBody}>
             <View style={styles.detailSection}>
               <Text style={styles.sectionTitle}>Informações do Cliente</Text>
+              <Text style={styles.detailText}>Pedido: {order.shortOrderNumber || order.id}</Text>
               {order.sellerCode && (
                 <Text style={styles.detailText}>Vendedor: {order.sellerCode}</Text>
               )}

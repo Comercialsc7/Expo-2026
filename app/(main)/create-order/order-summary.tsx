@@ -7,6 +7,7 @@ import { useOrderStore, OrderItem } from '../../../store/useOrderStore';
 import { useCachedOrdersStore } from '../../../store/useCachedOrdersStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateSpins } from '../../../lib/spinRewards';
+import { generateShortOrderNumber } from '../../../lib/orderNumber';
 
 interface SpinResult {
   prize: string;
@@ -56,9 +57,12 @@ export default function OrderSummaryScreen() {
     }
 
     console.log('Order to cache - sellerCode:', sellerCode);
+    const technicalOrderId = Date.now().toString();
+    const shortOrderNumber = await generateShortOrderNumber(sellerCode);
 
     const orderToCache = {
-      id: Date.now().toString(),
+      id: technicalOrderId,
+      shortOrderNumber,
       items: orderItems,
       client: client,
       paymentTerm: paymentTerm,

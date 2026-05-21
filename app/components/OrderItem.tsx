@@ -22,7 +22,7 @@ export const OrderItem: React.FC<OrderItemProps> = React.memo(({ item, onPress, 
     onPress={() => onPress(item)}
   >
     <View style={styles.orderHeader}>
-      <Text style={styles.cachedOrderId}>Pedido #{item.id}</Text>
+      <Text style={styles.cachedOrderId}>Pedido #{item.shortOrderNumber || item.id}</Text>
       <Text style={styles.cachedOrderDate}>
         {new Date(item.timestamp).toLocaleDateString('pt-BR')}
       </Text>

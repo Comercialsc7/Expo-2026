@@ -120,6 +120,7 @@ export async function syncCachedOrdersSpinPrizes(orders: CachedOrder[]): Promise
 
       const payload = {
         pedido_id: order.id,
+        numero_pedido_curto: order.shortOrderNumber || null,
         vendedor_codigo: order.sellerCode || '',
         cliente_code: order.client.code,
         cliente_nome: order.client.name,
