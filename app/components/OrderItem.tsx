@@ -9,6 +9,14 @@ interface OrderItemProps {
   enviado?: boolean;
 }
 
+const getDisplayOrderNumber = (order: CachedOrder) => {
+  if (order.shortOrderNumber) {
+    return order.shortOrderNumber;
+  }
+
+  return String(order.id || '').slice(-8);
+};
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -22,7 +30,7 @@ export const OrderItem: React.FC<OrderItemProps> = React.memo(({ item, onPress, 
     onPress={() => onPress(item)}
   >
     <View style={styles.orderHeader}>
-      <Text style={styles.cachedOrderId}>Pedido #{item.shortOrderNumber || item.id}</Text>
+      <Text style={styles.cachedOrderId}>Pedido #{getDisplayOrderNumber(item)}</Text>
       <Text style={styles.cachedOrderDate}>
         {new Date(item.timestamp).toLocaleDateString('pt-BR')}
       </Text>

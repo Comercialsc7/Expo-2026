@@ -13,6 +13,14 @@ interface OrderDetailsModalProps {
   visible: boolean;
 }
 
+const getDisplayOrderNumber = (order: CachedOrder) => {
+  if (order.shortOrderNumber) {
+    return order.shortOrderNumber;
+  }
+
+  return String(order.id || '').slice(-8);
+};
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -58,7 +66,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
           <ScrollView style={styles.modalBody}>
             <View style={styles.detailSection}>
               <Text style={styles.sectionTitle}>Informações do Cliente</Text>
-              <Text style={styles.detailText}>Pedido: {order.shortOrderNumber || order.id}</Text>
+              <Text style={styles.detailText}>Pedido: {getDisplayOrderNumber(order)}</Text>
               {order.sellerCode && (
                 <Text style={styles.detailText}>Vendedor: {order.sellerCode}</Text>
               )}
