@@ -22,6 +22,12 @@ export default function CreateOrderLayout() {
         }}
       />
       <Stack.Screen
+        name="product-detail"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="payment-method"
         options={{
           headerShown: false,

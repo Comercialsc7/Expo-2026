@@ -1,35 +1,59 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Image } from 'react-native';
 import { router } from 'expo-router';
-import { useProducts } from '../../../hooks/useProducts';
-
-interface Product {
-  id: string;
-  name: string;
-  code: string;
-  image_url: string | null;
-  price: number;
-  box_size: number;
-  is_accelerator: boolean;
-}
+import { useProducts, SupplierOption, UniqueProductOption } from '../../../hooks/useProducts';
 
 export default function ProductsScreen() {
-  const { products, loading, error } = useProducts();
+  const { suppliers, getUniqueProductsBySupplier, loading } = useProducts();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSupplier, setSelectedSupplier] = useState<SupplierOption | null>(null);
 
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.code.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredSuppliers = suppliers.filter((supplier) =>
+    supplier.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  console.log('Total de produtos carregados:', products.length);
-  console.log('Total de produtos exibidos (após filtro):', filteredProducts.length);
+  const filteredProducts = selectedSupplier === null
+    ? []
+    : getUniqueProductsBySupplier(selectedSupplier.codFor).filter((product) =>
+      String(product.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(product.code || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
-  const renderProductItem = ({ item }: { item: Product }) => (
-    <TouchableOpacity 
+  const handleSelectProduct = (product: UniqueProductOption) => {
+    if (!selectedSupplier) {
+      return;
+    }
+
+    router.push({
+      pathname: '/(main)/create-order/product-detail',
+      params: {
+        cod_for: String(selectedSupplier.codFor),
+        code: product.code,
+        name: product.name,
+        image_url: product.image_url || '',
+      },
+    });
+  };
+
+  const renderSupplierItem = ({ item }: { item: SupplierOption }) => (
+    <TouchableOpacity
       style={styles.productCard}
-      onPress={() => console.log('Produto clicado: ', item.id)}
+      onPress={() => {
+        setSelectedSupplier(item);
+        setSearchQuery('');
+      }}
+    >
+      <View style={styles.productInfo}>
+        <Text style={styles.productName}>{item.label}</Text>
+        <Text style={styles.productCode}>Fornecedor</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderProductItem = ({ item }: { item: UniqueProductOption }) => (
+    <TouchableOpacity
+      style={styles.productCard}
+      onPress={() => handleSelectProduct(item)}
     >
       {item.image_url ? (
         <Image source={{ uri: item.image_url }} style={styles.productImage} />
@@ -41,7 +65,6 @@ export default function ProductsScreen() {
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
         <Text style={styles.productCode}>Código: {item.code}</Text>
-        <Text style={styles.productPrice}>R$ {item.price.toFixed(2)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -53,9 +76,21 @@ export default function ProductsScreen() {
           <Image source={require('../../../assets/images/voltar.png')} style={styles.backIcon} />
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>Produtos</Text>
+          <Text style={styles.headerTitle}>{selectedSupplier ? 'Produtos' : 'Fornecedores'}</Text>
         </View>
-        <View style={{ width: 40 }} />
+        {selectedSupplier ? (
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedSupplier(null);
+              setSearchQuery('');
+            }}
+            style={styles.switchLevelButton}
+          >
+            <Text style={styles.switchLevelText}>Trocar</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 64 }} />
+        )}
       </View>
 
       <View style={styles.searchContainer}>
@@ -63,30 +98,36 @@ export default function ProductsScreen() {
           <Image source={require('../../../assets/images/buscar.png')} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar produtos..."
+            placeholder={selectedSupplier ? 'Buscar produtos...' : 'Buscar fornecedor...'}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
       </View>
 
+      {selectedSupplier && (
+        <View style={styles.selectedSupplierContainer}>
+          <Text style={styles.selectedSupplierText}>{selectedSupplier.label}</Text>
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Carregando produtos...</Text>
         </View>
-      ) : filteredProducts.length === 0 ? (
+      ) : (selectedSupplier ? filteredProducts.length : filteredSuppliers.length) === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>
             {searchQuery
-              ? 'Nenhum produto encontrado para esta busca.'
-              : 'Nenhum produto cadastrado.'}
+              ? 'Nenhum resultado para esta busca.'
+              : selectedSupplier ? 'Nenhum produto cadastrado para este fornecedor.' : 'Nenhum fornecedor cadastrado.'}
           </Text>
         </View>
       ) : (
       <FlatList
-          data={filteredProducts}
-          renderItem={renderProductItem}
-          keyExtractor={(item) => item.id}
+          data={selectedSupplier ? filteredProducts : filteredSuppliers}
+          renderItem={selectedSupplier ? renderProductItem : renderSupplierItem}
+          keyExtractor={(item) => selectedSupplier ? `${selectedSupplier.codFor}-${(item as UniqueProductOption).code}` : `${(item as SupplierOption).codFor}-${(item as SupplierOption).fornecedor}`}
         contentContainerStyle={styles.productList}
       />
       )}
@@ -121,6 +162,17 @@ const styles = StyleSheet.create({
     height: 40,
     resizeMode: 'contain',
   },
+  switchLevelButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#E8F0FE',
+    borderRadius: 8,
+  },
+  switchLevelText: {
+    color: '#003B71',
+    fontSize: 12,
+    fontFamily: 'Montserrat-Bold',
+  },
   searchContainer: {
     padding: 16,
     backgroundColor: '#FFFFFF',
@@ -147,6 +199,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333333',
     fontFamily: 'Montserrat-Regular',
+  },
+  selectedSupplierContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  selectedSupplierText: {
+    fontSize: 13,
+    color: '#003B71',
+    fontFamily: 'Montserrat-SemiBold',
   },
   productList: {
     padding: 16,
@@ -187,11 +249,6 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontFamily: 'Montserrat-Regular',
     marginBottom: 4,
-  },
-  productPrice: {
-    fontSize: 16,
-    color: '#0088CC',
-    fontFamily: 'Montserrat-Bold',
   },
   loadingContainer: {
     flex: 1,

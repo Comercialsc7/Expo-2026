@@ -415,7 +415,7 @@ export default function OrdersScreen() {
   };
 
   const acceleratorProducts = products.filter(
-    product => String(product.is_accelerator) === 'true' || String(product.is_accelerator) === '1'
+    product => String(product.is_acelerator) === 'true' || String(product.is_acelerator) === '1'
   );
 
   return (
@@ -523,7 +523,7 @@ export default function OrdersScreen() {
                     </Text>
                   </View>
                   <Text style={styles.productQuantity}>
-                    {product.box_size} unidades
+                    {product.emb} - {product.qtde}
                   </Text>
                 </View>
               </TouchableOpacity>

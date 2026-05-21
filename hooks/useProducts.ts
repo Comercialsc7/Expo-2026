@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import TableStore from '../lib/TableStore';
 import OfflineSQLiteService from '../lib/OfflineSQLiteService';
@@ -10,16 +10,95 @@ export interface Product {
   name: string;
   code: string;
   price: number;
-  box_size: number;
-  is_accelerator: boolean;
-  image_url: string;
+  emb: string;
+  qtde: number;
+  is_acelerator: boolean | number;
+  image_url: string | null;
+  fornecedor: string;
+  cod_for: number;
   created_at: string;
+}
+
+export interface SupplierOption {
+  codFor: number;
+  fornecedor: string;
+  label: string;
+}
+
+export interface UniqueProductOption {
+  code: string;
+  name: string;
+  image_url: string | null;
+  is_acelerator: boolean | number;
 }
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const suppliers = useMemo(() => {
+    const supplierMap = new Map<string, SupplierOption>();
+
+    products.forEach((product) => {
+      const codFor = Number(product.cod_for);
+      const fornecedor = String(product.fornecedor || '').trim();
+
+      if (!fornecedor || Number.isNaN(codFor)) {
+        return;
+      }
+
+      const key = `${codFor}::${fornecedor}`;
+      if (!supplierMap.has(key)) {
+        supplierMap.set(key, {
+          codFor,
+          fornecedor,
+          label: `${codFor} - ${fornecedor}`,
+        });
+      }
+    });
+
+    return Array.from(supplierMap.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, 'pt-BR')
+    );
+  }, [products]);
+
+  const getUniqueProductsBySupplier = (codFor: number): UniqueProductOption[] => {
+    const productMap = new Map<string, UniqueProductOption>();
+
+    products
+      .filter((product) => Number(product.cod_for) === Number(codFor))
+      .forEach((product) => {
+        if (!productMap.has(product.code)) {
+          productMap.set(product.code, {
+            code: product.code,
+            name: product.name,
+            image_url: product.image_url,
+            is_acelerator: product.is_acelerator,
+          });
+        }
+      });
+
+    return Array.from(productMap.values()).sort((a, b) =>
+      String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR')
+    );
+  };
+
+  const getProductVariants = (codFor: number, code: string): Product[] => {
+    return products
+      .filter(
+        (product) =>
+          Number(product.cod_for) === Number(codFor) &&
+          String(product.code) === String(code)
+      )
+      .sort((a, b) => {
+        const embComparison = String(a.emb || '').localeCompare(String(b.emb || ''), 'pt-BR');
+        if (embComparison !== 0) {
+          return embComparison;
+        }
+        return Number(a.qtde || 0) - Number(b.qtde || 0);
+      });
+  };
 
   const fetchProducts = async () => {
     let hasCachedProducts = false;
@@ -147,14 +226,14 @@ export const useProducts = () => {
     try {
       const { error } = await supabase
         .from('products')
-        .update({ is_accelerator: isAccelerator })
+        .update({ is_acelerator: isAccelerator })
         .eq('id', productId);
 
       if (error) throw error;
 
       const updatedProducts = products.map((product) =>
         product.id === productId
-          ? { ...product, is_accelerator: isAccelerator }
+          ? { ...product, is_acelerator: isAccelerator }
           : product
       );
 
@@ -171,7 +250,7 @@ export const useProducts = () => {
     } catch (err) {
       const updatedProducts = products.map((product) =>
         product.id === productId
-          ? { ...product, is_accelerator: isAccelerator }
+          ? { ...product, is_acelerator: isAccelerator }
           : product
       );
 
@@ -185,7 +264,7 @@ export const useProducts = () => {
           'update',
           {
             values: {
-              is_accelerator: isAccelerator,
+              is_acelerator: isAccelerator,
               updated_at: new Date().toISOString(),
             },
             filters: { id: productId },
@@ -208,6 +287,9 @@ export const useProducts = () => {
     products,
     loading,
     error,
+    suppliers,
+    getUniqueProductsBySupplier,
+    getProductVariants,
     fetchProducts,
     toggleAccelerator
   };

@@ -7,8 +7,7 @@ import Animated, {
   FadeIn
 } from 'react-native-reanimated';
 import { usePaymentTermsStore } from '../../../store/usePaymentTermsStore';
-import { useOrderStore } from '../../../store/useOrderStore';
-import { useProducts, Product } from '../../../hooks/useProducts';
+import { useProducts, UniqueProductOption } from '../../../hooks/useProducts';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -26,16 +25,22 @@ interface Product {
 
 export default function ProductSearch() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
   const { clientId, clientName, paymentTermId } = useLocalSearchParams();
   const paymentTerms = usePaymentTermsStore(state => state.paymentTerms);
   const selectedPaymentTerm = paymentTerms.find(term => term.id === paymentTermId);
-  const { addItem } = useOrderStore();
-  const { products, loading, error } = useProducts();
+  const { suppliers, getUniqueProductsBySupplier, loading, error } = useProducts();
 
-  const filteredProducts = products.filter(product =>
-    (product.name && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (product.code && product.code.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredSuppliers = suppliers.filter((supplier) =>
+    supplier.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const filteredProducts = selectedSupplier === null
+    ? []
+    : getUniqueProductsBySupplier(selectedSupplier).filter((product: UniqueProductOption) =>
+      (product.name && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (product.code && product.code.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
 
   if (loading) {
     return (
@@ -53,17 +58,15 @@ export default function ProductSearch() {
     );
   }
 
-  const handleSelectProduct = (product: Product) => {
+  const handleSelectProduct = (product: UniqueProductOption) => {
     router.push({
       pathname: '/(main)/create-order/product-detail',
       params: {
-        id: product.id,
+        cod_for: String(selectedSupplier),
         name: product.name,
         code: product.code,
-        price: product.price.toFixed(2),
-        box_size: product.box_size,
-        is_accelerator: product.is_accelerator ? 'true' : 'false',
         image_url: product.image_url,
+        paymentTermId: paymentTermId ? String(paymentTermId) : '',
       }
     });
   };
@@ -74,7 +77,7 @@ export default function ProductSearch() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Image source={require('../../../assets/images/voltar.png')} style={styles.headerIconImage} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Buscar Produtos</Text>
+        <Text style={styles.headerTitle}>Selecionar Produtos</Text>
       </View>
 
       {selectedPaymentTerm && (
@@ -91,37 +94,71 @@ export default function ProductSearch() {
           <Image source={require('../../../assets/images/buscar.png')} style={styles.searchInnerIconImage} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar produtos..."
+            placeholder={selectedSupplier === null ? 'Buscar fornecedor...' : 'Buscar produto...'}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
-        {filteredProducts.map((product, index) => (
+      {selectedSupplier !== null && (
+        <View style={styles.breadcrumbContainer}>
           <TouchableOpacity
-            key={product.id}
-            style={styles.productCard}
-            onPress={() => handleSelectProduct(product)}
+            style={styles.breadcrumbButton}
+            onPress={() => {
+              setSelectedSupplier(null);
+              setSearchQuery('');
+            }}
           >
-            <View style={styles.productInfo}>
-              <View style={styles.productHeaderNew}>
-                <Text style={styles.productCode}>{product.code}</Text>
-                {product.is_accelerator ? (
-                  <Image source={Diamond} style={styles.productAcceleratorIcon} />
-                ) : (
-                  <Text style={{ width: 30 }}></Text>
-                )}
-              </View>
-              <Text style={styles.productName}>{product.name}</Text>
-              <View style={styles.boxAndPriceRow}>
-                <Text style={styles.boxSize}>{product.box_size ? String(product.box_size).replace(/\b[Cc][Xx]\b/, 'emb: cx') : ''}</Text>
-                <Text style={styles.price}>R$ {product.price.toFixed(2)}</Text>
-              </View>
-            </View>
+            <Text style={styles.breadcrumbButtonText}>Trocar fornecedor</Text>
           </TouchableOpacity>
-        ))}
+        </View>
+      )}
+
+      <ScrollView style={styles.content}>
+        {selectedSupplier === null ? (
+          filteredSuppliers.map((supplier) => (
+            <TouchableOpacity
+              key={`${supplier.codFor}-${supplier.fornecedor}`}
+              style={styles.productCard}
+              onPress={() => {
+                setSelectedSupplier(supplier.codFor);
+                setSearchQuery('');
+              }}
+            >
+              <View style={styles.productInfo}>
+                <Text style={styles.productName}>{supplier.label}</Text>
+                <Text style={styles.productCode}>Fornecedor</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          filteredProducts.map((product) => {
+            const isAccelerator =
+              product.is_acelerator === true ||
+              Number(product.is_acelerator) === 1;
+
+            return (
+              <TouchableOpacity
+                key={`${selectedSupplier}-${product.code}`}
+                style={styles.productCard}
+                onPress={() => handleSelectProduct(product)}
+              >
+                <View style={styles.productInfo}>
+                  <View style={styles.productHeaderNew}>
+                    <Text style={styles.productCode}>{product.code}</Text>
+                    {isAccelerator ? (
+                      <Image source={Diamond} style={styles.productAcceleratorIcon} />
+                    ) : (
+                      <Text style={{ width: 30 }}></Text>
+                    )}
+                  </View>
+                  <Text style={styles.productName}>{product.name}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
       </ScrollView>
     </View>
   );
@@ -184,6 +221,23 @@ const styles = StyleSheet.create({
   searchInnerIconImage: {
     width: 40,
     height: 40,
+  },
+  breadcrumbContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  breadcrumbButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E8F0FE',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  breadcrumbButtonText: {
+    fontSize: 12,
+    color: '#003B71',
+    fontFamily: 'Montserrat-SemiBold',
   },
   content: {
     padding: 16,
