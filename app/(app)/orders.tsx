@@ -131,10 +131,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 12,
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
+    width: 108,
+    height: 108,
+    justifyContent: 'space-between',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -150,17 +152,24 @@ const styles = StyleSheet.create({
       }
     }),
   },
+  brandImageContainer: {
+    width: '100%',
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   brandImage: {
-    width: 60,
-    height: 40,
+    width: '100%',
+    height: '100%',
     resizeMode: 'contain',
-    marginBottom: 8,
   },
   brandName: {
     fontSize: 12,
     color: '#003B71',
     fontFamily: 'Montserrat-Medium',
     textAlign: 'center',
+    lineHeight: 14,
+    width: '100%',
   },
   productsSection: {
     marginBottom: 24,
@@ -487,11 +496,13 @@ export default function OrdersScreen() {
                 style={styles.brandCard}
                 onPress={() => navigateTo(`/(main)/brands/${brand.id}` as any)}
               >
-                <Image
-                  source={brand.image_url ? { uri: brand.image_url } : undefined}
-                  style={styles.brandImage}
-                />
-                <Text style={styles.brandName}>{brand.name}</Text>
+                <View style={styles.brandImageContainer}>
+                  <Image
+                    source={brand.image_url ? { uri: brand.image_url } : undefined}
+                    style={styles.brandImage}
+                  />
+                </View>
+                <Text style={styles.brandName} numberOfLines={2}>{brand.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
