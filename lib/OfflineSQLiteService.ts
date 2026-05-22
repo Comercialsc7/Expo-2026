@@ -1,4 +1,5 @@
 import { openDatabaseAsync, SQLiteDatabase } from 'expo-sqlite';
+import { inferOfflineRecordKey } from './offlineRecordKey';
 
 export type PendingOpType = 'insert' | 'upsert' | 'update' | 'delete';
 
@@ -79,25 +80,6 @@ class OfflineSQLiteService {
     this.initialized = true;
   }
 
-  private static inferRecordKey(record: any): string {
-    if (!record || typeof record !== 'object') {
-      return `${Date.now()}-${Math.random()}`;
-    }
-
-    const preferredKeys = ['_id', 'id', 'code', 'user_id', 'pedido_id'];
-    for (const key of preferredKeys) {
-      if (record[key] !== undefined && record[key] !== null && String(record[key]) !== '') {
-        return String(record[key]);
-      }
-    }
-
-    if (record.codcli !== undefined && record.diamax !== undefined) {
-      return `${String(record.codcli)}:${String(record.diamax)}`;
-    }
-
-    return `${Date.now()}-${Math.random()}`;
-  }
-
   static async upsertMany(tableName: string, records: any[]): Promise<number> {
     await this.init();
     const db = await this.getDb();
@@ -110,7 +92,7 @@ class OfflineSQLiteService {
     let success = 0;
 
     for (const record of records) {
-      const recordKey = this.inferRecordKey(record);
+      const recordKey = inferOfflineRecordKey(tableName, record);
       await db.runAsync(
         `INSERT OR REPLACE INTO offline_records (table_name, record_key, payload, updated_at)
          VALUES (?, ?, ?, ?);`,
