@@ -7,16 +7,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../../lib/TableStore';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
 
-const mergeByKey = (existing: any[], incoming: any[], key: string) => {
+const mergeByKey = (
+  existing: any[],
+  incoming: any[],
+  keyOrResolver: string | ((item: any) => string)
+) => {
   const map = new Map<string, any>();
+  const resolveKey = (item: any) => {
+    if (typeof keyOrResolver === 'function') {
+      return keyOrResolver(item);
+    }
+    return String(item?.[keyOrResolver] ?? item?.id ?? '');
+  };
 
   for (const item of existing || []) {
-    const k = String(item?.[key] ?? item?.id ?? '');
+    const k = resolveKey(item);
     if (k) map.set(k, item);
   }
 
   for (const item of incoming || []) {
-    const k = String(item?.[key] ?? item?.id ?? '');
+    const k = resolveKey(item);
     if (k) map.set(k, item);
   }
 
@@ -199,7 +209,13 @@ export default function SelectClient() {
       if (fetchedClients.length > 0) {
         try {
           const existingClients = await TableStore.get('clients');
-          const mergedClients = mergeByKey(existingClients, fetchedClients, 'code');
+          // O mesmo cliente pode aparecer para vendedores/equipes diferentes.
+          // Usa chave composta para evitar sobrescrever registros no cache local.
+          const mergedClients = mergeByKey(
+            existingClients,
+            fetchedClients,
+            (client: any) => `${String(client?.code || '')}:${String(client?.equipe || '')}:${String(client?.repre || '')}:${String(client?.id || '')}`
+          );
           await TableStore.set('clients', mergedClients);
           await OfflineSQLiteService.upsertMany('clients', fetchedClients);
         } catch (cacheError) {
@@ -279,7 +295,7 @@ export default function SelectClient() {
       <FlatList
         data={filteredClients}
         renderItem={renderClientItem}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => `${item.id}:${item.code}:${String(item.equipe ?? '')}:${String(item.repre ?? '')}`}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       />
