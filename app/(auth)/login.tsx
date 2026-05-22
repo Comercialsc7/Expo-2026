@@ -228,10 +228,13 @@ export default function Login() {
         await TableStore.set('users', userData);
         console.log('✅ Login Online Sucesso. Usuário cacheado.');
 
-        // Dispara preparação do cache em background
-        OfflineCache.prepare([
-          'teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo'
-        ]).catch(console.error);
+        // Dispara preparação do cache em background.
+        // Para clients, filtra apenas os clientes do vendedor logado
+        // (evita baixar/cachear os 20k clientes inteiros).
+        OfflineCache.prepare(
+          ['teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo'],
+          { clients: { equipe: Number(selectedTeam), repre: representativeCode } }
+        ).catch(console.error);
 
         router.push('/(app)/orders');
         return;

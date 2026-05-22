@@ -10,6 +10,7 @@ import { InstallPWABanner } from '../components/shared/InstallPWABanner';
 import { OfflineIndicator } from '../components/shared/OfflineIndicator';
 import OfflineCache from '../lib/OfflineCache';
 import OfflineSQLiteService from '../lib/OfflineSQLiteService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -48,17 +49,21 @@ export default function RootLayout() {
         if (!status.ready || await OfflineCache.isStale(60)) {
           console.log('🔄 Preparando cache offline em background...');
 
-          // Prepara em background sem bloquear UI
-          OfflineCache.prepare([
-            'teams',
-            'products',
-            'clients',
-            'brands',
-            'users',
-            'pedidos',
-            'prazos',
-            'relacao_prazo'
-          ]).then(result => {
+          // Prepara em background sem bloquear UI.
+          // Lê equipe/repre do AsyncStorage para filtrar clients e evitar baixar 20k registros.
+          const [equipeStr, repreStr] = await Promise.all([
+            AsyncStorage.getItem('selectedTeamCode'),
+            AsyncStorage.getItem('representativeCodeToStore'),
+          ]);
+          const clientFilters: Record<string, Record<string, string | number>> =
+            equipeStr && repreStr
+              ? { clients: { equipe: Number(equipeStr), repre: repreStr } }
+              : {};
+
+          OfflineCache.prepare(
+            ['teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo'],
+            clientFilters
+          ).then(result => {
             if (result.success) {
               console.log('✅ Cache offline preparado automaticamente!');
             } else {

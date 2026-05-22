@@ -28,7 +28,10 @@ class OfflineCache {
    *
    * Salva sessão e faz cache de todas as tabelas importantes
    */
-  static async prepare(tables: string[] = []): Promise<{
+  static async prepare(
+    tables: string[] = [],
+    tableFilters: Record<string, Record<string, string | number>> = {}
+  ): Promise<{
     success: boolean;
     cached: string[];
     errors: string[];
@@ -65,7 +68,7 @@ class OfflineCache {
       if (tables.length > 0) {
         for (const table of tables) {
           try {
-            const count = await this.cacheTable(table);
+            const count = await this.cacheTable(table, tableFilters[table]);
             cached.push(`${table} (${count} registros)`);
             console.log(`✅ [OfflineCache] ${table}: ${count} registros em cache`);
           } catch (error) {
@@ -137,14 +140,37 @@ class OfflineCache {
   }
 
   /**
-   * Faz cache de uma tabela do Supabase
+   * Faz cache de uma tabela do Supabase.
+   * @param filters Filtros opcionais aplicados via .eq() na query (ex.: { equipe: 2, repre: '3272' }).
+   *                Reduz volume baixado e cacheado para tabelas grandes como clients.
    */
-  private static async cacheTable(table: string): Promise<number> {
+  private static async cacheTable(
+    table: string,
+    filters?: Record<string, string | number>
+  ): Promise<number> {
     console.log(`🔎 [OfflineCache] Iniciando download de tabela '${table}' do Supabase`);
-    const { data, error } = await supabase
-      .from(table)
-      .select('*')
-      .order('created_at', { ascending: false });
+
+    let baseQuery = supabase.from(table).select('*') as any;
+
+    // Aplica filtros antes do order (ex.: equipe + repre para clients).
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        baseQuery = baseQuery.eq(key, value);
+      }
+    }
+
+    // Tenta ordenar por created_at; algumas tabelas podem não ter essa coluna.
+    let data: any[] | null = null;
+    let error: any = null;
+    try {
+      const result = await baseQuery.order('created_at', { ascending: false });
+      data = result.data;
+      error = result.error;
+    } catch {
+      const result = await baseQuery;
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error(`❌ [OfflineCache] Erro ao baixar tabela '${table}':`, error);
@@ -155,14 +181,9 @@ class OfflineCache {
     console.log(`ℹ️ [OfflineCache] Tabela '${table}' - registros recebidos: ${count}`);
 
     if (data && data.length > 0) {
-      // Log sample (até 5 registros) para depuração
-      try {
-        console.log(`📄 [OfflineCache] Amostra de registros de '${table}':`, data.slice(0, 5));
-      } catch (logError) {
-        console.warn(`⚠️ [OfflineCache] Não foi possível logar amostra de '${table}':`, logError);
-      }
-
       await TableStore.set(table, data);
+      // Persiste também no OfflineSQLiteService para que getAllWhere funcione no offline.
+      await OfflineSQLiteService.upsertMany(table, data);
       return data.length;
     }
 

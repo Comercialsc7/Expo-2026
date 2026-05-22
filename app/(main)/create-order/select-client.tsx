@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
@@ -35,6 +35,8 @@ const mergeByKey = (
 
 export default function SelectClient() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [codigoEquipeFiltro, setCodigoEquipeFiltro] = useState<number | null>(null);
@@ -69,7 +71,7 @@ export default function SelectClient() {
     }
   }, [codigoEquipeFiltro, codigoRepresentanteFiltro]);
 
-  const getPaymentTermsWithFallback = async (clientCode: string): Promise<PaymentTerm[]> => {
+  const getPaymentTermsWithFallback = useCallback(async (clientCode: string): Promise<PaymentTerm[]> => {
     try {
       const { data: relacaoPrazo, error: errorRelacao } = await supabase
         .from('relacao_prazo')
@@ -154,7 +156,7 @@ export default function SelectClient() {
           prazo_dias: prazo.dias,
         }));
     }
-  };
+  }, []);
 
   const fetchClients = async () => {
     if (codigoEquipeFiltro === null || codigoRepresentanteFiltro === null) {
@@ -241,13 +243,30 @@ export default function SelectClient() {
     }
   };
 
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.cnpj.toLowerCase().includes(searchQuery.toLowerCase())
+  const handleSearch = useCallback((text: string) => {
+    setSearchQuery(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedQuery(text), 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
+
+  const filteredClients = useMemo(() =>
+    clients.filter(client =>
+      client.name.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+      client.code.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+      client.cnpj.toLowerCase().includes(debouncedQuery.toLowerCase())
+    ),
+    [clients, debouncedQuery]
   );
 
-  const handleSelectClient = async (client: Client) => {
+  const handleSelectClient = useCallback(async (client: Client) => {
     try {
       const payment_terms = await getPaymentTermsWithFallback(client.code);
 
@@ -258,9 +277,9 @@ export default function SelectClient() {
       console.error('Erro ao buscar condições de pagamento do cliente:', error);
       alert('Erro ao buscar condições de pagamento do cliente.');
     }
-  };
+  }, [getPaymentTermsWithFallback, setClient]);
 
-  const renderClientItem = ({ item }: { item: Client }) => (
+  const renderClientItem = useCallback(({ item }: { item: Client }) => (
     <TouchableOpacity
       style={styles.clientItem}
       onPress={() => handleSelectClient(item)}
@@ -274,7 +293,7 @@ export default function SelectClient() {
         {item.address && <Text style={styles.clientCnpj}>Endereço: {item.address}</Text>}
       </View>
     </TouchableOpacity>
-  );
+  ), [handleSelectClient]);
 
   return (
     <View style={styles.container}>
@@ -292,7 +311,7 @@ export default function SelectClient() {
           style={styles.searchInput}
           placeholder="Buscar clientes..."
           value={searchQuery}
-          onChangeText={setSearchQuery}
+          onChangeText={handleSearch}
         />
         </View>
       </View>
@@ -301,6 +320,12 @@ export default function SelectClient() {
         data={filteredClients}
         renderItem={renderClientItem}
         keyExtractor={(item) => `${item.id}:${item.code}:${String(item.equipe ?? '')}:${String(item.repre ?? '')}`}
+        initialNumToRender={20}
+        maxToRenderPerBatch={20}
+        updateCellsBatchingPeriod={50}
+        windowSize={10}
+        removeClippedSubviews
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       />
