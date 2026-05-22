@@ -417,7 +417,7 @@ export default function OrdersScreen() {
       const sqliteBrands = await OfflineSQLiteService.getAll<Brand>('brands');
       if (sqliteBrands.length > 0) {
         const sortedSQLiteBrands = [...sqliteBrands].sort((a, b) =>
-          String(b.created_at || '').localeCompare(String(a.created_at || ''))
+          String(a.created_at || '').localeCompare(String(b.created_at || ''))
         );
         setBrands(sortedSQLiteBrands);
         hasCachedBrands = true;
@@ -426,7 +426,7 @@ export default function OrdersScreen() {
       const tableStoreBrands = await TableStore.get('brands');
       if (tableStoreBrands.length > 0) {
         const sortedTableStoreBrands = [...tableStoreBrands].sort((a: Brand, b: Brand) =>
-          String(b.created_at || '').localeCompare(String(a.created_at || ''))
+          String(a.created_at || '').localeCompare(String(b.created_at || ''))
         );
         setBrands(sortedTableStoreBrands as Brand[]);
         hasCachedBrands = true;
@@ -439,7 +439,7 @@ export default function OrdersScreen() {
       const { data, error } = await supabase
         .from('brands')
         .select('id, name, image_url, created_at')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) {
         throw error;
