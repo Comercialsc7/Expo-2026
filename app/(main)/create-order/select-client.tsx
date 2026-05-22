@@ -163,18 +163,23 @@ export default function SelectClient() {
     }
 
     const readCachedClients = async (): Promise<Client[]> => {
-      const sqliteClients = await OfflineSQLiteService.getAll('clients');
-      const cachedClients = sqliteClients.length > 0
-        ? sqliteClients
-        : await TableStore.get('clients');
+      // Filtra diretamente via SQL (json_extract) — não carrega 20k registros em memória.
+      const sqliteClients = await OfflineSQLiteService.getAllWhere('clients', {
+        equipe: codigoEquipeFiltro!,
+        repre: codigoRepresentanteFiltro!,
+      });
 
-      const filteredCachedClients = cachedClients.filter(
+      if (sqliteClients.length > 0) {
+        return sqliteClients as Client[];
+      }
+
+      // Fallback para TableStore (cache em memória) com filtro JS.
+      const cachedClients = await TableStore.get('clients');
+      return cachedClients.filter(
         (client: any) =>
           Number(client.equipe) === Number(codigoEquipeFiltro) &&
           String(client.repre) === String(codigoRepresentanteFiltro)
-      );
-
-      return filteredCachedClients as Client[];
+      ) as Client[];
     };
 
     try {

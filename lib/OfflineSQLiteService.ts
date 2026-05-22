@@ -91,18 +91,20 @@ class OfflineSQLiteService {
     const now = new Date().toISOString();
     let success = 0;
 
-    for (const record of records) {
-      const recordKey = inferOfflineRecordKey(tableName, record);
-      await db.runAsync(
-        `INSERT OR REPLACE INTO offline_records (table_name, record_key, payload, updated_at)
-         VALUES (?, ?, ?, ?);`,
-        tableName,
-        recordKey,
-        JSON.stringify(record),
-        now
-      );
-      success++;
-    }
+    await db.withTransactionAsync(async () => {
+      for (const record of records) {
+        const recordKey = inferOfflineRecordKey(tableName, record);
+        await db.runAsync(
+          `INSERT OR REPLACE INTO offline_records (table_name, record_key, payload, updated_at)
+           VALUES (?, ?, ?, ?);`,
+          tableName,
+          recordKey,
+          JSON.stringify(record),
+          now
+        );
+        success++;
+      }
+    });
 
     return success;
   }
@@ -111,8 +113,29 @@ class OfflineSQLiteService {
     await this.init();
     const db = await this.getDb();
 
-    await db.runAsync(`DELETE FROM offline_records WHERE table_name = ?;`, tableName);
-    return this.upsertMany(tableName, records || []);
+    const now = new Date().toISOString();
+    const safeRecords = records || [];
+    let success = 0;
+
+    // DELETE + INSERT numa transação única: evita estado inconsistente
+    // e não aninha transações (não chama upsertMany).
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(`DELETE FROM offline_records WHERE table_name = ?;`, tableName);
+      for (const record of safeRecords) {
+        const recordKey = inferOfflineRecordKey(tableName, record);
+        await db.runAsync(
+          `INSERT OR REPLACE INTO offline_records (table_name, record_key, payload, updated_at)
+           VALUES (?, ?, ?, ?);`,
+          tableName,
+          recordKey,
+          JSON.stringify(record),
+          now
+        );
+        success++;
+      }
+    });
+
+    return success;
   }
 
   static async getAll<T = any>(tableName: string): Promise<T[]> {
@@ -122,6 +145,46 @@ class OfflineSQLiteService {
     const rows = await db.getAllAsync<{ payload: string }>(
       `SELECT payload FROM offline_records WHERE table_name = ? ORDER BY updated_at DESC;`,
       tableName
+    );
+
+    return rows
+      .map((row) => {
+        try {
+          return JSON.parse(row.payload) as T;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as T[];
+  }
+
+  /**
+   * Filtra registros diretamente via SQL usando json_extract.
+   * Evita carregar toda a tabela na memória JS para depois filtrar.
+   * @param filters Objeto com campos e valores a filtrar (ex.: { equipe: 2, repre: '3272' })
+   */
+  static async getAllWhere<T = any>(
+    tableName: string,
+    filters: Record<string, string | number>
+  ): Promise<T[]> {
+    await this.init();
+    const db = await this.getDb();
+
+    const entries = Object.entries(filters);
+    if (entries.length === 0) {
+      return this.getAll<T>(tableName);
+    }
+
+    const whereClauses = entries
+      .map(([key]) => `json_extract(payload, '$.${key}') = ?`)
+      .join(' AND ');
+    const filterValues = entries.map(([, v]) => v);
+
+    const rows = await db.getAllAsync<{ payload: string }>(
+      `SELECT payload FROM offline_records
+       WHERE table_name = ? AND ${whereClauses}
+       ORDER BY updated_at DESC;`,
+      [tableName, ...filterValues]
     );
 
     return rows
