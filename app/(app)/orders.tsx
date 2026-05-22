@@ -16,11 +16,14 @@ import { supabase } from '../../lib/supabase';
 import SectionHeader from '../../components/shared/SectionHeader';
 import { useProducts } from '../../hooks/useProducts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import TableStore from '../../lib/TableStore';
+import OfflineSQLiteService from '../../lib/OfflineSQLiteService';
 
 interface Brand {
   id: string;
   name: string;
-  image_url: string;
+  image_url: string | null;
+  created_at?: string;
 }
 
 interface Order {
@@ -395,10 +398,6 @@ export default function OrdersScreen() {
     opacity: fadeAnim.value,
   }));
 
-  const handleViewAllBrands = () => {
-    navigateTo('/brands' as any);
-  };
-
   const handleOrder = () => {
     navigateTo('/(main)/create-order/select-client');
   };
@@ -412,14 +411,52 @@ export default function OrdersScreen() {
   }, []);
 
   const fetchBrands = async () => {
-    const { data, error } = await supabase
-      .from('brands')
-      .select('id, name, image_url');
+    let hasCachedBrands = false;
 
-    if (error) {
-      console.error('Erro ao buscar marcas:', error);
-    } else {
-      setBrands((data as Brand[]) || []);
+    try {
+      const sqliteBrands = await OfflineSQLiteService.getAll<Brand>('brands');
+      if (sqliteBrands.length > 0) {
+        const sortedSQLiteBrands = [...sqliteBrands].sort((a, b) =>
+          String(b.created_at || '').localeCompare(String(a.created_at || ''))
+        );
+        setBrands(sortedSQLiteBrands);
+        hasCachedBrands = true;
+      }
+
+      const tableStoreBrands = await TableStore.get('brands');
+      if (tableStoreBrands.length > 0) {
+        const sortedTableStoreBrands = [...tableStoreBrands].sort((a: Brand, b: Brand) =>
+          String(b.created_at || '').localeCompare(String(a.created_at || ''))
+        );
+        setBrands(sortedTableStoreBrands as Brand[]);
+        hasCachedBrands = true;
+      }
+    } catch (cacheError) {
+      console.warn('Falha ao carregar marcas do cache local:', cacheError);
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('id, name, image_url, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const onlineBrands = (data as Brand[]) || [];
+      setBrands(onlineBrands);
+
+      if (onlineBrands.length > 0) {
+        await TableStore.set('brands', onlineBrands);
+        await OfflineSQLiteService.replaceTable('brands', onlineBrands);
+      }
+    } catch (onlineError) {
+      if (!hasCachedBrands) {
+        console.error('Erro ao buscar marcas:', onlineError);
+        setBrands([]);
+      }
     }
   };
 
@@ -481,20 +518,16 @@ export default function OrdersScreen() {
         )}
 
         <View style={styles.brandsSection}>
-          <SectionHeader
-            title="Marcas"
-            onViewAll={handleViewAllBrands}
-          />
+          <SectionHeader title="Marcas" />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.brandsScroll}
           >
             {brands.map((brand) => (
-              <TouchableOpacity
+              <View
                 key={brand.id}
                 style={styles.brandCard}
-                onPress={() => navigateTo(`/(main)/brands/${brand.id}` as any)}
               >
                 <View style={styles.brandImageContainer}>
                   <Image
@@ -503,7 +536,7 @@ export default function OrdersScreen() {
                   />
                 </View>
                 <Text style={styles.brandName} numberOfLines={2}>{brand.name}</Text>
-              </TouchableOpacity>
+              </View>
             ))}
           </ScrollView>
         </View>
@@ -523,7 +556,7 @@ export default function OrdersScreen() {
                 onPress={() => navigateTo('/products' as any)}
               >
                 <Image
-                  source={{ uri: product.image_url }}
+                  source={product.image_url ? { uri: product.image_url } : undefined}
                   style={styles.productImage}
                 />
                 <View style={styles.productInfo}>
