@@ -285,6 +285,7 @@ export default function ProductDetail() {
                 onPress={() => handleSelectTier(tier)}
               >
                 <Text style={styles.tierText}>{tier.emb} qtde {tier.faixa}</Text>
+                <Text style={styles.tierUnitPrice}>und: {formatBRL(tier.unitPrice)}</Text>
                 <Text style={styles.tierPrice}>R$ {formatBRL(tier.boxPrice)}</Text>
               </TouchableOpacity>
             ))
@@ -437,11 +438,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333333',
     fontFamily: 'Montserrat-Medium',
+    flex: 1.2,
+  },
+  tierUnitPrice: {
+    fontSize: 13,
+    color: '#666666',
+    fontFamily: 'Montserrat-Regular',
+    flex: 1,
+    textAlign: 'center',
   },
   tierPrice: {
     fontSize: 14,
     color: '#003B71',
     fontFamily: 'Montserrat-SemiBold',
+    flex: 1,
+    textAlign: 'right',
   },
   emptyTierText: {
     fontSize: 13,
