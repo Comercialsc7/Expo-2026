@@ -6,9 +6,49 @@ import { useOrderStore } from '../../../store/useOrderStore';
 import { useProducts } from '../../../hooks/useProducts';
 import { supabase } from '../../../lib/supabase';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
+import TableStore from '../../../lib/TableStore';
 import { buildTierPriceOptions, EscalonadaRow, TierPriceOption } from '../../../lib/escalonadaPricing';
 
 const formatBRL = (value: number) => Number(value || 0).toFixed(2).replace('.', ',');
+
+const normalizeCode = (value: unknown): string => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  return raw.replace(/^0+/, '') || '0';
+};
+
+const buildCodeCandidates = (value: string): Array<string | number> => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return [];
+
+  const set = new Set<string>();
+  const candidates: Array<string | number> = [];
+  const pushString = (v: string) => {
+    const key = `s:${v}`;
+    if (!set.has(key)) {
+      set.add(key);
+      candidates.push(v);
+    }
+  };
+  const pushNumber = (v: number) => {
+    const key = `n:${v}`;
+    if (!set.has(key)) {
+      set.add(key);
+      candidates.push(v);
+    }
+  };
+
+  pushString(trimmed);
+  pushString(normalizeCode(trimmed));
+
+  const parsed = Number(trimmed);
+  if (Number.isFinite(parsed)) {
+    pushNumber(parsed);
+    pushString(String(parsed));
+  }
+
+  return candidates;
+};
 
 export default function ProductDetail() {
   const params = useLocalSearchParams();
@@ -66,34 +106,56 @@ export default function ProductDetail() {
         return;
       }
 
-      const parsedCode = Number(code);
-      const codFilter: string | number = Number.isNaN(parsedCode) ? String(code) : parsedCode;
+      const codeCandidates = buildCodeCandidates(String(code));
+      const selectedCodeNorm = normalizeCode(code);
+      const matchesSelectedCode = (row: EscalonadaRow) => {
+        const rowCodeNorm = normalizeCode(row.cod);
+        return rowCodeNorm === selectedCodeNorm;
+      };
 
       try {
-        const cached = await OfflineSQLiteService.getAllWhere<EscalonadaRow>('escalonada', {
-          cod: codFilter,
-        });
-        if (isMounted && cached.length > 0) {
-          setEscalonadaRows(cached);
+        // Fallback local completo para cenários onde cod foi salvo com tipo diferente
+        // (string vs number) ou com zeros à esquerda.
+        const [sqliteAll, tableStoreAll] = await Promise.all([
+          OfflineSQLiteService.getAll<EscalonadaRow>('escalonada'),
+          TableStore.get('escalonada'),
+        ]);
+
+        const localRows = [...sqliteAll, ...(tableStoreAll as EscalonadaRow[])].filter(matchesSelectedCode);
+        if (isMounted && localRows.length > 0) {
+          setEscalonadaRows(localRows);
         }
       } catch (cacheError) {
         console.warn('⚠️ Falha ao ler escalonadas do cache local:', cacheError);
       }
 
       try {
-        let query = supabase
-          .from('escalonada')
-          .select('cod, faixa, preco')
-          .order('faixa', { ascending: true });
+        let rows: EscalonadaRow[] = [];
+        let lastError: any = null;
 
-        query = Number.isNaN(parsedCode)
-          ? query.eq('cod', String(code))
-          : query.eq('cod', parsedCode);
+        for (const candidate of codeCandidates) {
+          const { data, error } = await supabase
+            .from('escalonada')
+            .select('cod, faixa, preco')
+            .eq('cod', candidate)
+            .order('faixa', { ascending: true });
 
-        const { data, error } = await query;
-        if (error) throw error;
+          if (error) {
+            lastError = error;
+            continue;
+          }
 
-        const rows = (data || []) as EscalonadaRow[];
+          const current = (data || []) as EscalonadaRow[];
+          if (current.length > 0) {
+            rows = current;
+            break;
+          }
+        }
+
+        if (!rows.length && lastError) {
+          throw lastError;
+        }
+
         if (isMounted) {
           setEscalonadaRows(rows);
         }
