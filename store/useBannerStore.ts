@@ -25,7 +25,7 @@ export const useBannerStore = create<BannerStore>((set) => ({
       title: "Promoção Especial",
       subtitle: "Até 30% de desconto em bebidas",
       backgroundColor: "#FF6B6B",
-      image: 'https://wuappvtbbjzdtgrcenwk.supabase.co/storage/v1/object/public/Comprapremiada/girosorte.gif',
+      image: 'https://wuappvtbbjzdtgrcenwk.supabase.co/storage/v1/object/public/Comprapremiada/arte_compra_premiada.png',
       order: 0
     },
     {
