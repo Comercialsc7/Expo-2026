@@ -4,18 +4,11 @@ import RNPickerSelect from 'react-native-picker-select';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOrderStore } from '../../../store/useOrderStore';
 import { useProducts } from '../../../hooks/useProducts';
+import { supabase } from '../../../lib/supabase';
+import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
+import { buildTierPriceOptions, EscalonadaRow, TierPriceOption } from '../../../lib/escalonadaPricing';
 
-interface TierPrice {
-  emb: string;
-  qtde: number;
-  price: number;
-}
-
-const mockTierPrices: TierPrice[] = [
-  { emb: 'CX', qtde: 10, price: 21.34 },
-  { emb: 'CX', qtde: 15, price: 20.45 },
-  { emb: 'CX', qtde: 35, price: 19.99 },
-];
+const formatBRL = (value: number) => Number(value || 0).toFixed(2).replace('.', ',');
 
 export default function ProductDetail() {
   const params = useLocalSearchParams();
@@ -40,6 +33,8 @@ export default function ProductDetail() {
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('1');
   const [price, setPrice] = useState<string>('0,00');
+  const [escalonadaRows, setEscalonadaRows] = useState<EscalonadaRow[]>([]);
+  const [selectedFaixa, setSelectedFaixa] = useState<number | null>(null);
 
   useEffect(() => {
     if (variants.length > 0 && !selectedVariantId) {
@@ -54,12 +49,83 @@ export default function ProductDetail() {
 
   const selectedProductName = selectedVariant?.name || String(params.name || 'Produto');
 
+  const tierPrices = useMemo(() => {
+    const emb = String(selectedVariant?.emb || 'UN');
+    const qtdeEmb = Number(selectedVariant?.qtde || 1);
+    return buildTierPriceOptions(escalonadaRows, emb, qtdeEmb);
+  }, [escalonadaRows, selectedVariant]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadEscalonadas = async () => {
+      if (!code) {
+        if (isMounted) {
+          setEscalonadaRows([]);
+        }
+        return;
+      }
+
+      const parsedCode = Number(code);
+      const codFilter: string | number = Number.isNaN(parsedCode) ? String(code) : parsedCode;
+
+      try {
+        const cached = await OfflineSQLiteService.getAllWhere<EscalonadaRow>('escalonada', {
+          cod: codFilter,
+        });
+        if (isMounted && cached.length > 0) {
+          setEscalonadaRows(cached);
+        }
+      } catch (cacheError) {
+        console.warn('⚠️ Falha ao ler escalonadas do cache local:', cacheError);
+      }
+
+      try {
+        let query = supabase
+          .from('escalonada')
+          .select('cod, faixa, preco')
+          .order('faixa', { ascending: true });
+
+        query = Number.isNaN(parsedCode)
+          ? query.eq('cod', String(code))
+          : query.eq('cod', parsedCode);
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const rows = (data || []) as EscalonadaRow[];
+        if (isMounted) {
+          setEscalonadaRows(rows);
+        }
+
+        if (rows.length > 0) {
+          await OfflineSQLiteService.upsertMany('escalonada', rows);
+        }
+      } catch (onlineError) {
+        console.warn('⚠️ Falha ao buscar escalonadas online. Mantendo cache local.', onlineError);
+      }
+    };
+
+    loadEscalonadas();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [code]);
+
   const handleVariantChange = (variantId: string) => {
     setSelectedVariantId(variantId);
+    setSelectedFaixa(null);
     const variant = variants.find((item) => item.id === variantId);
     if (variant) {
-      setPrice(Number(variant.price || 0).toFixed(2).replace('.', ','));
+      setPrice(formatBRL(Number(variant.price || 0)));
     }
+  };
+
+  const handleSelectTier = (tier: TierPriceOption) => {
+    setSelectedFaixa(tier.faixa);
+    setQuantity(String(tier.faixa));
+    setPrice(formatBRL(tier.boxPrice));
   };
 
   const handleAddToOrder = () => {
@@ -144,12 +210,23 @@ export default function ProductDetail() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Escalonadas</Text>
-          {mockTierPrices.map((tier, index) => (
-            <View key={`${tier.emb}-${tier.qtde}-${index}`} style={styles.tierItem}>
-              <Text style={styles.tierText}>{tier.emb} qtde {tier.qtde}</Text>
-              <Text style={styles.tierPrice}>R$ {tier.price.toFixed(2).replace('.', ',')}</Text>
-            </View>
-          ))}
+          {tierPrices.length === 0 ? (
+            <Text style={styles.emptyTierText}>Sem faixas escalonadas para este produto.</Text>
+          ) : (
+            tierPrices.map((tier) => (
+              <TouchableOpacity
+                key={`${selectedVariant?.code || code}-${tier.faixa}`}
+                style={[
+                  styles.tierItem,
+                  selectedFaixa === tier.faixa ? styles.tierItemSelected : null,
+                ]}
+                onPress={() => handleSelectTier(tier)}
+              >
+                <Text style={styles.tierText}>{tier.emb} qtde {tier.faixa}</Text>
+                <Text style={styles.tierPrice}>R$ {formatBRL(tier.boxPrice)}</Text>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         <View style={styles.section}>
@@ -284,10 +361,15 @@ const styles = StyleSheet.create({
   },
   tierItem: {
     paddingVertical: 10,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    borderRadius: 8,
+  },
+  tierItemSelected: {
+    backgroundColor: '#E8F0FE',
   },
   tierText: {
     fontSize: 14,
@@ -298,6 +380,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#003B71',
     fontFamily: 'Montserrat-SemiBold',
+  },
+  emptyTierText: {
+    fontSize: 13,
+    color: '#666666',
+    fontFamily: 'Montserrat-Regular',
   },
   controlLabel: {
     fontSize: 13,
