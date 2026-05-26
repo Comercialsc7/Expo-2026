@@ -205,9 +205,34 @@ export default function SyncOrdersScreen() {
       // 1) Envia pendências locais
       await upload();
 
+      const downloadedTables: string[] = [];
+      const failedTables: Array<{ table: string; message: string }> = [];
+
       // 2) Força download completo de cada tabela crítica para garantir cache offline
       for (const table of syncTables) {
-        await downloadTable(table, true);
+        try {
+          await downloadTable(table, true);
+          downloadedTables.push(table);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'erro desconhecido';
+          failedTables.push({ table, message: errorMessage });
+          console.error(`Falha ao baixar tabela '${table}' durante sincronização completa:`, error);
+        }
+      }
+
+      if (failedTables.length > 0) {
+        const syncedSummary = downloadedTables.length > 0
+          ? `Atualizadas: ${downloadedTables.join(', ')}.`
+          : 'Nenhuma tabela foi atualizada.';
+        const failedSummary = failedTables
+          .map(({ table, message }) => `${table}: ${message}`)
+          .join('\n');
+
+        Alert.alert(
+          'Sincronização parcial',
+          `${syncedSummary}\nFalharam:\n${failedSummary}`,
+        );
+        return;
       }
 
       Alert.alert('Sucesso', 'Sincronização completa concluída!');
@@ -215,7 +240,8 @@ export default function SyncOrdersScreen() {
       setShowReconnectNotice(false);
       setLastNoticeDismissAt(null);
     } catch (error) {
-      Alert.alert('Erro', 'Falha na sincronização. Tente novamente.');
+      const errorMessage = error instanceof Error ? error.message : 'erro desconhecido';
+      Alert.alert('Erro', `Falha na sincronização: ${errorMessage}`);
     }
   }, [applySyncedSpinPrizePhotos, cachedOrders, downloadTable, isOnline, upload, syncTables]);
 
