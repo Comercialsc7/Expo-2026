@@ -72,25 +72,47 @@ export default function SyncOrdersScreen() {
     }
 
     webhookTimerRef.current = setTimeout(async () => {
+      const payload = {
+        event: 'send_pending_clicked',
+        triggeredAt: new Date().toISOString(),
+        pendingOrders: pendingOrdersCount,
+      };
+
       try {
         const response = await fetch(syncWebhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            event: 'send_pending_clicked',
-            triggeredAt: new Date().toISOString(),
-            pendingOrders: pendingOrdersCount,
-          }),
+          body: JSON.stringify(payload),
         });
 
-        if (!response.ok) {
-          const responseText = await response.text();
+        if (response.ok) {
+          console.log(`[SyncOrders] Webhook (POST) disparado com sucesso (${pendingOrdersCount} pendências).`);
+          return;
+        }
+
+        const responseText = await response.text();
+        const expectsGet =
+          response.status === 404 &&
+          /not registered for POST requests|did you mean to make a GET request/i.test(responseText);
+
+        if (!expectsGet) {
           throw new Error(`Webhook retornou ${response.status}: ${responseText}`);
         }
 
-        console.log(`[SyncOrders] Webhook disparado com sucesso (${pendingOrdersCount} pendências).`);
+        const getUrl = new URL(syncWebhookUrl);
+        getUrl.searchParams.set('event', payload.event);
+        getUrl.searchParams.set('triggeredAt', payload.triggeredAt);
+        getUrl.searchParams.set('pendingOrders', String(payload.pendingOrders));
+
+        const getResponse = await fetch(getUrl.toString(), { method: 'GET' });
+        if (!getResponse.ok) {
+          const getResponseText = await getResponse.text();
+          throw new Error(`Webhook GET retornou ${getResponse.status}: ${getResponseText}`);
+        }
+
+        console.log(`[SyncOrders] Webhook (GET fallback) disparado com sucesso (${pendingOrdersCount} pendências).`);
       } catch (webhookError) {
         console.error('[SyncOrders] Falha ao disparar webhook de envio de pendências:', webhookError);
       } finally {
