@@ -173,12 +173,13 @@ export class SyncService {
         break;
       }
 
-      for (const record of rows) {
-        await SQLiteStore.save(table, {
+      await SQLiteStore.upsertMany(
+        table,
+        rows.map((record) => ({
           ...record,
           _synced: true,
-        });
-      }
+        }))
+      );
 
       downloaded += rows.length;
 
@@ -473,13 +474,14 @@ export class SyncService {
               await SQLiteStore.clear(table);
             }
 
-            // Salva os registros novos/atualizados
-            for (const record of data) {
-              await SQLiteStore.save(table, {
+            // Salva os registros novos/atualizados em lote para evitar travamento com tabelas grandes.
+            await SQLiteStore.upsertMany(
+              table,
+              data.map((record) => ({
                 ...record,
                 _synced: true,
-              });
-            }
+              }))
+            );
 
             results.downloaded[table] = data.length;
             console.log(`✅ [SyncService] ${data.length} registros baixados de '${table}'`);
@@ -681,12 +683,13 @@ export class SyncService {
           await SQLiteStore.clear(table);
         }
 
-        for (const record of data) {
-          await SQLiteStore.save(table, {
+        await SQLiteStore.upsertMany(
+          table,
+          data.map((record) => ({
             ...record,
             _synced: true,
-          });
-        }
+          }))
+        );
 
         console.log(`✅ [SyncService] ${data.length} registros baixados de '${table}'`);
 

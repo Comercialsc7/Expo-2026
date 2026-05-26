@@ -110,6 +110,44 @@ export class SQLiteStore {
 		return doc;
 	}
 
+	static async upsertMany(table: string, records: any[]): Promise<number> {
+		try {
+			if (!records || records.length === 0) return 0;
+
+			const backend = await this.getBackend();
+			const timestamp = new Date().toISOString();
+			const docs: LocalRecord[] = records.map((record) => {
+				const isLocalRecord =
+					record &&
+					typeof record === 'object' &&
+					'table' in record &&
+					'payload' in record;
+
+				return isLocalRecord
+					? {
+						...record,
+						_id: record._id || this.generateId(),
+						_rev: record._rev || '1-sqlite',
+						createdAt: record.createdAt || timestamp,
+						updatedAt: timestamp,
+					}
+					: {
+						_id: record?._id || this.generateId(),
+						_rev: '1-sqlite',
+						table,
+						payload: record,
+						createdAt: timestamp,
+						updatedAt: timestamp,
+					};
+			});
+
+			return await backend.upsertMany(this.tableKey(table), docs);
+		} catch (error) {
+			console.error(`Error upserting many records into ${table}:`, error);
+			return 0;
+		}
+	}
+
 	static async getAll(table: string): Promise<LocalRecord[]> {
 		try {
 			const backend = await this.getBackend();
