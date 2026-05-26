@@ -9,6 +9,7 @@ const RETRY_BASE_DELAY_MS = 1200;
 interface SyncedSpinPrizeOrder {
   orderId: string;
   publicUrl: string | null;
+  publicUrls: string[];
 }
 
 interface SyncSpinPrizeResult {
@@ -95,6 +96,18 @@ async function uploadSpinPrizePhoto(photoUri: string, orderId: string): Promise<
   return publicUrl;
 }
 
+function normalizeSpinPrizes(order: CachedOrder) {
+  if (order.spinPrizes && order.spinPrizes.length > 0) {
+    return order.spinPrizes;
+  }
+
+  if (order.spinPrize) {
+    return [order.spinPrize];
+  }
+
+  return [];
+}
+
 function buildProdutosPayload(order: CachedOrder) {
   return order.items.map((item) => ({
     produto_id: item.code,
@@ -115,8 +128,29 @@ export async function syncCachedOrdersSpinPrizes(orders: CachedOrder[]): Promise
 
   for (const order of orders) {
     try {
-      const prizePhoto = order.spinPrize?.photo || null;
-      const publicUrl = prizePhoto ? await uploadSpinPrizePhoto(prizePhoto, order.id) : null;
+      const normalizedPrizes = normalizeSpinPrizes(order);
+      const syncedPrizes = [];
+
+      for (const prize of normalizedPrizes) {
+        const uploadedPhotoUrl = prize.photo
+          ? await uploadSpinPrizePhoto(prize.photo, order.id)
+          : null;
+
+        syncedPrizes.push({
+          ...prize,
+          photo: uploadedPhotoUrl || prize.photo,
+          photoSynced: !prize.photo || !!uploadedPhotoUrl,
+        });
+      }
+
+      const firstPrize = syncedPrizes[0];
+      const firstPrizeUrl = syncedPrizes.find((prize) => !!prize.photo)?.photo || null;
+      const prizeSummaryPayload = syncedPrizes.map((prize) => ({
+        type: prize.type,
+        description: prize.description,
+        photo_url: prize.photo || null,
+        photo_synced: !!prize.photoSynced,
+      }));
 
       const payload = {
         pedido_id: order.id,
@@ -130,7 +164,10 @@ export async function syncCachedOrdersSpinPrizes(orders: CachedOrder[]): Promise
         desconto: order.discount,
         total: order.total,
         prazo_pagamento: order.paymentTerm?.description || '',
-        premio_imagem_url: publicUrl,
+        premio_tipo: firstPrize?.type || null,
+        premio_descricao: firstPrize?.description || null,
+        premios_roleta: prizeSummaryPayload,
+        premio_imagem_url: firstPrizeUrl,
         status_envio: 'pendente',
       };
 
@@ -148,18 +185,14 @@ export async function syncCachedOrdersSpinPrizes(orders: CachedOrder[]): Promise
         ...order,
         _id: order.id,
         enviado: true,
-        spinPrize: order.spinPrize
-          ? {
-              ...order.spinPrize,
-              photo: publicUrl || order.spinPrize.photo,
-              photoSynced: !prizePhoto || !!publicUrl,
-            }
-          : order.spinPrize,
+        spinPrize: syncedPrizes[0],
+        spinPrizes: syncedPrizes,
       });
 
       result.synced.push({
         orderId: order.id,
-        publicUrl,
+        publicUrl: firstPrizeUrl,
+        publicUrls: syncedPrizes.map((prize) => prize.photo).filter((photo): photo is string => !!photo),
       });
     } catch (error) {
       result.failed.push({

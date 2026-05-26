@@ -36,6 +36,10 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
 }) => {
   if (!order) return null;
 
+  const prizesToShow = order.spinPrizes && order.spinPrizes.length > 0
+    ? order.spinPrizes
+    : (order.spinPrize ? [order.spinPrize] : []);
+
   return (
     <Modal
       visible={visible}
@@ -115,18 +119,22 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
               </View>
             </View>
 
-            {order.spinPrize && (
+            {prizesToShow.length > 0 && (
               <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Prêmio da Roleta</Text>
-                <Text style={styles.detailText}>Tipo: {order.spinPrize.type}</Text>
-                <Text style={styles.detailText}>Descrição: {order.spinPrize.description}</Text>
-                {order.spinPrize.photo && (
-                  <Image 
-                    source={{ uri: order.spinPrize.photo }} 
-                    style={{ width: '100%', height: 200, marginTop: 8, borderRadius: 8 }}
-                    resizeMode="contain"
-                  />
-                )}
+                <Text style={styles.sectionTitle}>Prêmios da Roleta</Text>
+                {prizesToShow.map((prize, index) => (
+                  <View key={`${prize.description}-${index}`} style={{ marginBottom: 12 }}>
+                    <Text style={styles.detailText}>Tipo: {prize.type}</Text>
+                    <Text style={styles.detailText}>Descrição: {prize.description}</Text>
+                    {prize.photo && (
+                      <Image
+                        source={{ uri: prize.photo }}
+                        style={{ width: '100%', height: 200, marginTop: 8, borderRadius: 8 }}
+                        resizeMode="contain"
+                      />
+                    )}
+                  </View>
+                ))}
               </View>
             )}
           </ScrollView>
@@ -137,5 +145,3 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
 });
 
 export default OrderDetailsModal;
-
-export default OrderDetailsModal; 

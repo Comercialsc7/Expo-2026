@@ -135,11 +135,21 @@ export default function SyncOrdersScreen() {
   }, [blurActiveElementOnWeb]);
 
   const applySyncedSpinPrizePhotos = useCallback((
-    syncedOrders: Array<{ orderId: string; publicUrl: string | null }>,
+    syncedOrders: Array<{ orderId: string; publicUrl: string | null; publicUrls?: string[] }>,
   ) => {
-    syncedOrders.forEach(({ orderId, publicUrl }) => {
+    syncedOrders.forEach(({ orderId, publicUrl, publicUrls }) => {
       updateCachedOrder(orderId, (order) => ({
         ...order,
+        spinPrizes: order.spinPrizes?.length
+          ? order.spinPrizes.map((prize, index) => {
+              const nextPhoto = publicUrls?.[index] || prize.photo;
+              return {
+                ...prize,
+                photo: nextPhoto,
+                photoSynced: !prize.photo || !!nextPhoto,
+              };
+            })
+          : order.spinPrizes,
         spinPrize: order.spinPrize
           ? {
               ...order.spinPrize,

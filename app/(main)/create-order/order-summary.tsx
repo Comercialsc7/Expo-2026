@@ -8,6 +8,7 @@ import { useCachedOrdersStore } from '../../../store/useCachedOrdersStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateSpins } from '../../../lib/spinRewards';
 import { generateShortOrderNumber } from '../../../lib/orderNumber';
+import type { SpinPrizeEntry } from '../../../store/useCachedOrdersStore';
 
 interface SpinResult {
   prize: string;
@@ -65,6 +66,12 @@ export default function OrderSummaryScreen() {
     console.log('Order to cache - sellerCode:', sellerCode);
     const technicalOrderId = Date.now().toString();
     const shortOrderNumber = await generateShortOrderNumber(sellerCode);
+    const mappedSpinPrizes: SpinPrizeEntry[] = results.map((result) => ({
+      type: result.prize === 'Não foi dessa vez' ? 'no_prize' : 'product',
+      description: result.prize,
+      photo: result.photoUri,
+      photoSynced: !result.photoUri,
+    }));
 
     const orderToCache = {
       id: technicalOrderId,
@@ -79,12 +86,8 @@ export default function OrderSummaryScreen() {
       sellerCode: sellerCode || '',
       email: email,
       enviado: false,
-      spinPrize: results.length > 0 ? {
-        type: results[0].prize === 'Não foi dessa vez' ? 'no_prize' as const : 'product' as const,
-        description: results[0].prize,
-        photo: results[0].photoUri,
-        photoSynced: false,
-      } : undefined
+      spinPrize: mappedSpinPrizes[0],
+      spinPrizes: mappedSpinPrizes,
     };
 
     addCachedOrder(orderToCache);

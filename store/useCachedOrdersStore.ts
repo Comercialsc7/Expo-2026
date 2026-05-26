@@ -5,6 +5,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import SQLiteStore from '../lib/SQLiteStore';
 
+export interface SpinPrizeEntry {
+  type: 'product' | 'no_prize';
+  description: string;
+  photo?: string;
+  photoSynced?: boolean;
+}
+
 export interface CachedOrder {
   id: string;
   shortOrderNumber?: string;
@@ -17,12 +24,8 @@ export interface CachedOrder {
   discount: number;
   sellerCode?: string;
   userId?: string;
-  spinPrize?: {
-    type: 'product' | 'no_prize';
-    description: string;
-    photo?: string;
-    photoSynced?: boolean;
-  };
+  spinPrize?: SpinPrizeEntry;
+  spinPrizes?: SpinPrizeEntry[];
   email?: string;
   enviado?: boolean;
 }
