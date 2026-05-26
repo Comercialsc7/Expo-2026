@@ -13,6 +13,7 @@ import { syncCachedOrdersSpinPrizes } from '../lib/spinPrizeSync';
 
 const closeIcon = require('../assets/images/x.png');
 const backIcon = require('../assets/images/voltar.png');
+const syncWebhookUrl = process.env.EXPO_PUBLIC_SYNC_WEBHOOK_URL;
 
 export default function SyncOrdersScreen() {
   const syncTables = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'escalonada', 'relacao_prazo'];
@@ -30,6 +31,7 @@ export default function SyncOrdersScreen() {
   const [lastNoticeDismissAt, setLastNoticeDismissAt] = useState<number | null>(null);
   const previousOnlineRef = useRef<boolean | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const webhookTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const blurActiveElementOnWeb = useCallback(() => {
     if (typeof document === 'undefined') return;
@@ -52,6 +54,45 @@ export default function SyncOrdersScreen() {
     } catch (error) {
       console.error('Erro ao contar registros pendentes:', error);
     }
+  }, []);
+
+  const scheduleDelayedSyncWebhook = useCallback((pendingOrdersCount: number) => {
+    if (!syncWebhookUrl) {
+      console.warn('[SyncOrders] EXPO_PUBLIC_SYNC_WEBHOOK_URL não configurada.');
+      return;
+    }
+
+    if (webhookTimerRef.current) {
+      clearTimeout(webhookTimerRef.current);
+      webhookTimerRef.current = null;
+    }
+
+    webhookTimerRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(syncWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            event: 'send_pending_clicked',
+            triggeredAt: new Date().toISOString(),
+            pendingOrders: pendingOrdersCount,
+          }),
+        });
+
+        if (!response.ok) {
+          const responseText = await response.text();
+          throw new Error(`Webhook retornou ${response.status}: ${responseText}`);
+        }
+
+        console.log(`[SyncOrders] Webhook disparado com sucesso (${pendingOrdersCount} pendências).`);
+      } catch (webhookError) {
+        console.error('[SyncOrders] Falha ao disparar webhook de envio de pendências:', webhookError);
+      } finally {
+        webhookTimerRef.current = null;
+      }
+    }, 30000);
   }, []);
 
   useEffect(() => {
@@ -103,6 +144,13 @@ export default function SyncOrdersScreen() {
       }
     };
   }, [requiresManualUpdate, isOnline, showReconnectNotice, lastNoticeDismissAt]);
+
+  useEffect(() => () => {
+    if (webhookTimerRef.current) {
+      clearTimeout(webhookTimerRef.current);
+      webhookTimerRef.current = null;
+    }
+  }, []);
 
   const dismissReconnectNotice = useCallback(() => {
     setShowReconnectNotice(false);
@@ -169,6 +217,8 @@ export default function SyncOrdersScreen() {
       }
 
       const pendingOrders = cachedOrders.filter((order) => !order.enviado);
+      scheduleDelayedSyncWebhook(pendingOrders.length);
+
       const spinPrizeResult = await syncCachedOrdersSpinPrizes(pendingOrders);
       applySyncedSpinPrizePhotos(spinPrizeResult.synced);
 
@@ -192,7 +242,7 @@ export default function SyncOrdersScreen() {
     } catch (error) {
       Alert.alert('Erro', 'Falha ao enviar pendências. Tente novamente.');
     }
-  }, [applySyncedSpinPrizePhotos, cachedOrders, isOnline, refreshPendingCount, upload]);
+  }, [applySyncedSpinPrizePhotos, cachedOrders, isOnline, refreshPendingCount, scheduleDelayedSyncWebhook, upload]);
 
   const handleSyncDownload = useCallback(async () => {
     try {
