@@ -46,19 +46,20 @@ export default function SyncOrdersScreen() {
     _setSelectedOrder(order);
   }, [blurActiveElementOnWeb]);
 
-  useEffect(() => {
-    async function countPending() {
-      try {
-        const stats = await OfflineMutationQueue.getStats();
-        setPendingCount(stats.pending);
-      } catch (error) {
-        console.error('Erro ao contar registros pendentes:', error);
-      }
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      const stats = await OfflineMutationQueue.getStats();
+      setPendingCount(stats.pending);
+    } catch (error) {
+      console.error('Erro ao contar registros pendentes:', error);
     }
-    countPending();
-    const interval = setInterval(countPending, 3000);
-    return () => clearInterval(interval);
-  }, [syncing]);
+  }, []);
+
+  useEffect(() => {
+    if (!syncing) {
+      void refreshPendingCount();
+    }
+  }, [refreshPendingCount, syncing]);
 
   useEffect(() => {
     const previous = previousOnlineRef.current;
