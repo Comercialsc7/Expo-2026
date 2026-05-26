@@ -13,10 +13,9 @@ import { syncCachedOrdersSpinPrizes } from '../lib/spinPrizeSync';
 
 const closeIcon = require('../assets/images/x.png');
 const backIcon = require('../assets/images/voltar.png');
-const lixeiraIcon = require('../assets/images/lixeira.png');
 
 export default function SyncOrdersScreen() {
-  const syncTables = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'relacao_prazo'];
+  const syncTables = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'escalonada', 'relacao_prazo'];
 
   const { goBack } = useNavigation();
   const { cachedOrders, _hasHydrated, removeCachedOrder, updateCachedOrder } = useCachedOrdersStore();
@@ -226,13 +225,6 @@ export default function SyncOrdersScreen() {
       Alert.alert('Erro', 'Falha na sincronização. Tente novamente.');
     }
   }, [cachedOrders, downloadTable, isOnline, updateCachedOrder, upload, syncTables]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
 
   const renderSyncStatus = () => {
     if (!syncing && !syncError && !message) return null;
