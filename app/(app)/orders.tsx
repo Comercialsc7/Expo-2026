@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   productItem: {
     marginRight: 16,
@@ -216,8 +216,14 @@ const styles = StyleSheet.create({
     }),
   },
   productItemGrid: {
-    flex: 1 / 3, // Each item takes 1/3 of the row
-    margin: 4, // Add some margin between items
+    // Em web, evita colapso extremo de largura dos cards.
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: '31%',
+    width: '31%',
+    minWidth: 120,
+    marginHorizontal: '1%',
+    marginBottom: 8,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
@@ -265,6 +271,7 @@ const styles = StyleSheet.create({
     color: '#003B71',
     fontFamily: 'Montserrat-Bold',
     marginBottom: 4,
+    lineHeight: 18,
   },
   priceContainer: {
     flexDirection: 'row',
@@ -280,6 +287,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
     fontFamily: 'Montserrat-Regular',
+    lineHeight: 16,
   },
   orderButtonContainer: {
     position: 'absolute',
@@ -651,13 +659,13 @@ export default function OrdersScreen() {
                     </View>
                   )}
                   <View style={styles.productInfo}>
-                    <Text style={styles.productName}>{product.name}</Text>
+                    <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
                     <View style={styles.priceContainer}>
                       <Text style={styles.productPrice}>
                         R$ {Number(product.price || 0).toFixed(2)}
                       </Text>
                     </View>
-                    <Text style={styles.productQuantity}>
+                    <Text style={styles.productQuantity} numberOfLines={1}>
                       {product.emb} - {product.qtde}
                     </Text>
                   </View>
