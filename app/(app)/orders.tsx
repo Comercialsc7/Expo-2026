@@ -270,8 +270,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    width: 22,
-    height: 22,
+    width: 32,
+    height: 32,
     resizeMode: 'contain',
     zIndex: 2,
   },
@@ -675,7 +675,7 @@ export default function OrdersScreen() {
                 <TouchableOpacity
                   key={product.id}
                   style={styles.productItemGrid}
-                  onPress={() => navigateTo('/products' as any)}
+                  onPress={() => navigateTo('/create-order' as any)}
                 >
                   <Image
                     source={Diamond}
