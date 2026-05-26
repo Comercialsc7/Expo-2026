@@ -152,6 +152,7 @@ export async function syncCachedOrdersSpinPrizes(orders: CachedOrder[]): Promise
           ? {
               ...order.spinPrize,
               photo: publicUrl || order.spinPrize.photo,
+              photoSynced: !prizePhoto || !!publicUrl,
             }
           : order.spinPrize,
       });

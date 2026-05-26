@@ -21,6 +21,7 @@ export interface CachedOrder {
     type: 'product' | 'no_prize';
     description: string;
     photo?: string;
+    photoSynced?: boolean;
   };
   email?: string;
   enviado?: boolean;

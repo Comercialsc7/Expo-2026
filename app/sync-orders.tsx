@@ -134,6 +134,23 @@ export default function SyncOrdersScreen() {
     setIsDeleteConfirmModalVisible(false);
   }, [blurActiveElementOnWeb]);
 
+  const applySyncedSpinPrizePhotos = useCallback((
+    syncedOrders: Array<{ orderId: string; publicUrl: string | null }>,
+  ) => {
+    syncedOrders.forEach(({ orderId, publicUrl }) => {
+      updateCachedOrder(orderId, (order) => ({
+        ...order,
+        spinPrize: order.spinPrize
+          ? {
+              ...order.spinPrize,
+              photo: publicUrl || order.spinPrize.photo,
+              photoSynced: !order.spinPrize.photo || !!publicUrl,
+            }
+          : order.spinPrize,
+      }));
+    });
+  }, [updateCachedOrder]);
+
   const handleSyncUpload = useCallback(async () => {
     try {
       if (!isOnline) {
@@ -143,19 +160,7 @@ export default function SyncOrdersScreen() {
 
       const pendingOrders = cachedOrders.filter((order) => !order.enviado);
       const spinPrizeResult = await syncCachedOrdersSpinPrizes(pendingOrders);
-
-      spinPrizeResult.synced.forEach(({ orderId, publicUrl }) => {
-        updateCachedOrder(orderId, (order) => ({
-          ...order,
-          enviado: true,
-          spinPrize: order.spinPrize
-            ? {
-                ...order.spinPrize,
-                photo: publicUrl || order.spinPrize.photo,
-              }
-            : order.spinPrize,
-        }));
-      });
+      applySyncedSpinPrizePhotos(spinPrizeResult.synced);
 
       if (spinPrizeResult.failed.length > 0) {
         console.warn('Falhas ao sincronizar fotos dos prêmios:', spinPrizeResult.failed);
@@ -166,7 +171,7 @@ export default function SyncOrdersScreen() {
     } catch (error) {
       Alert.alert('Erro', 'Falha ao enviar pendências. Tente novamente.');
     }
-  }, [cachedOrders, isOnline, updateCachedOrder, upload]);
+  }, [applySyncedSpinPrizePhotos, cachedOrders, isOnline, upload]);
 
   const handleSyncDownload = useCallback(async () => {
     try {
@@ -191,19 +196,7 @@ export default function SyncOrdersScreen() {
 
       const pendingOrders = cachedOrders.filter((order) => !order.enviado);
       const spinPrizeResult = await syncCachedOrdersSpinPrizes(pendingOrders);
-
-      spinPrizeResult.synced.forEach(({ orderId, publicUrl }) => {
-        updateCachedOrder(orderId, (order) => ({
-          ...order,
-          enviado: true,
-          spinPrize: order.spinPrize
-            ? {
-                ...order.spinPrize,
-                photo: publicUrl || order.spinPrize.photo,
-              }
-            : order.spinPrize,
-        }));
-      });
+      applySyncedSpinPrizePhotos(spinPrizeResult.synced);
 
       if (spinPrizeResult.failed.length > 0) {
         console.warn('Falhas ao sincronizar fotos dos prêmios:', spinPrizeResult.failed);
@@ -224,7 +217,7 @@ export default function SyncOrdersScreen() {
     } catch (error) {
       Alert.alert('Erro', 'Falha na sincronização. Tente novamente.');
     }
-  }, [cachedOrders, downloadTable, isOnline, updateCachedOrder, upload, syncTables]);
+  }, [applySyncedSpinPrizePhotos, cachedOrders, downloadTable, isOnline, upload, syncTables]);
 
   const renderSyncStatus = () => {
     if (!syncing && !syncError && !message) return null;

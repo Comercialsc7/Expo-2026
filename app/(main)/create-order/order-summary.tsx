@@ -82,7 +82,8 @@ export default function OrderSummaryScreen() {
       spinPrize: results.length > 0 ? {
         type: results[0].prize === 'Não foi dessa vez' ? 'no_prize' as const : 'product' as const,
         description: results[0].prize,
-        photo: results[0].photoUri
+        photo: results[0].photoUri,
+        photoSynced: false,
       } : undefined
     };
 
