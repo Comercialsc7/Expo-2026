@@ -79,28 +79,6 @@ export default function SyncOrdersScreen() {
       };
 
       try {
-        const response = await fetch(syncWebhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (response.ok) {
-          console.log(`[SyncOrders] Webhook (POST) disparado com sucesso (${pendingOrdersCount} pendências).`);
-          return;
-        }
-
-        const responseText = await response.text();
-        const expectsGet =
-          response.status === 404 &&
-          /not registered for POST requests|did you mean to make a GET request/i.test(responseText);
-
-        if (!expectsGet) {
-          throw new Error(`Webhook retornou ${response.status}: ${responseText}`);
-        }
-
         const getUrl = new URL(syncWebhookUrl);
         getUrl.searchParams.set('event', payload.event);
         getUrl.searchParams.set('triggeredAt', payload.triggeredAt);
@@ -112,7 +90,7 @@ export default function SyncOrdersScreen() {
           throw new Error(`Webhook GET retornou ${getResponse.status}: ${getResponseText}`);
         }
 
-        console.log(`[SyncOrders] Webhook (GET fallback) disparado com sucesso (${pendingOrdersCount} pendências).`);
+        console.log(`[SyncOrders] Webhook (GET) disparado com sucesso (${pendingOrdersCount} pendências).`);
       } catch (webhookError) {
         console.error('[SyncOrders] Falha ao disparar webhook de envio de pendências:', webhookError);
       } finally {
