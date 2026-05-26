@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert, Modal, Image } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image } from 'react-native';
 import { useNavigation } from '../hooks/useNavigation';
 import { useCachedOrdersStore, CachedOrder } from '../store/useCachedOrdersStore';
 import { OrderItem } from './components/OrderItem';
@@ -285,6 +285,114 @@ export default function SyncOrdersScreen() {
     );
   };
 
+  const renderOrderItem = useCallback(({ item }: { item: CachedOrder }) => (
+    <OrderItem
+      item={item}
+      enviado={sentOrders.includes(item.id)}
+      onPress={setSelectedOrder}
+    />
+  ), [sentOrders, setSelectedOrder]);
+
+  const renderListHeader = useCallback(() => (
+    <View style={styles.content}>
+      <Text style={styles.descriptionText}>Gerencie o envio e recebimento de dados de pedidos.</Text>
+
+      {showReconnectNotice && requiresManualUpdate && isOnline && (
+        <View style={styles.reconnectNotice}>
+          <Text style={styles.reconnectNoticeText}>
+            Conexão restabelecida. Realize "Atualizar Dados" para recarregar o cache offline.
+          </Text>
+          <TouchableOpacity
+            onPress={dismissReconnectNotice}
+            style={styles.reconnectNoticeCloseButton}
+            accessibilityLabel="Fechar aviso de atualização"
+          >
+            <Text style={styles.reconnectNoticeCloseText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{pendingCount}</Text>
+          <Text style={styles.statLabel}>Registros Pendentes</Text>
+        </View>
+        <View style={styles.statBox}>
+          <Text style={styles.statValue}>{cachedOrders.length}</Text>
+          <Text style={styles.statLabel}>Pedidos em Cache</Text>
+        </View>
+      </View>
+
+      {renderSyncStatus()}
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.sendButton,
+            syncing && styles.buttonDisabled
+          ]}
+          onPress={handleSyncUpload}
+          disabled={syncing}
+        >
+          {syncing ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>⬆️ Enviar Pendências</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.receiveButton,
+            syncing && styles.buttonDisabled
+          ]}
+          onPress={handleSyncDownload}
+          disabled={syncing}
+        >
+          {syncing ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>⬇️ Atualizar Dados</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.syncButton,
+            syncing && styles.buttonDisabled
+          ]}
+          onPress={handleFullSync}
+          disabled={syncing}
+        >
+          {syncing ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>🔄 Sincronizar Tudo</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.cachedOrdersSection}>
+        <Text style={styles.cachedOrdersTitle}>Pedidos em Cache:</Text>
+      </View>
+    </View>
+  ), [
+    cachedOrders.length,
+    dismissReconnectNotice,
+    handleFullSync,
+    handleSyncDownload,
+    handleSyncUpload,
+    isOnline,
+    pendingCount,
+    renderSyncStatus,
+    requiresManualUpdate,
+    showReconnectNotice,
+    syncing,
+  ]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -296,111 +404,24 @@ export default function SyncOrdersScreen() {
           <ConnectionBadge isOnlineOverride={isOnline} />
         </View>
       </View>
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
-        <View style={styles.content}>
-          <Text style={styles.descriptionText}>Gerencie o envio e recebimento de dados de pedidos.</Text>
-
-          {showReconnectNotice && requiresManualUpdate && isOnline && (
-            <View style={styles.reconnectNotice}>
-              <Text style={styles.reconnectNoticeText}>
-                Conexão restabelecida. Realize "Atualizar Dados" para recarregar o cache offline.
-              </Text>
-              <TouchableOpacity
-                onPress={dismissReconnectNotice}
-                style={styles.reconnectNoticeCloseButton}
-                accessibilityLabel="Fechar aviso de atualização"
-              >
-                <Text style={styles.reconnectNoticeCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>{pendingCount}</Text>
-              <Text style={styles.statLabel}>Registros Pendentes</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>{cachedOrders.length}</Text>
-              <Text style={styles.statLabel}>Pedidos em Cache</Text>
-            </View>
-          </View>
-
-          {renderSyncStatus()}
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.sendButton,
-                syncing && styles.buttonDisabled
-              ]}
-              onPress={handleSyncUpload}
-              disabled={syncing}
-            >
-              {syncing ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.buttonText}>⬆️ Enviar Pendências</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.receiveButton,
-                syncing && styles.buttonDisabled
-              ]}
-              onPress={handleSyncDownload}
-              disabled={syncing}
-            >
-              {syncing ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.buttonText}>⬇️ Atualizar Dados</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.syncButton,
-                syncing && styles.buttonDisabled
-              ]}
-              onPress={handleFullSync}
-              disabled={syncing}
-            >
-              {syncing ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.buttonText}>🔄 Sincronizar Tudo</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.cachedOrdersSection}>
-            <Text style={styles.cachedOrdersTitle}>Pedidos em Cache:</Text>
-            {!_hasHydrated ? (
-              <ActivityIndicator size="large" color="#003B71" />
-            ) : cachedOrders.length === 0 ? (
-              <Text style={styles.noOrdersText}>Nenhum pedido em cache no momento.</Text>
-            ) : (
-              <FlatList
-                data={cachedOrders}
-                renderItem={({ item }) => (
-                  <OrderItem
-                    item={item}
-                    enviado={sentOrders.includes(item.id)}
-                    onPress={setSelectedOrder}
-                  />
-                )}
-                keyExtractor={(item) => item.id}
-                nestedScrollEnabled={true}
-              />
-            )}
-          </View>
-        </View>
-      </ScrollView>
+      <FlatList
+        data={_hasHydrated ? cachedOrders : []}
+        renderItem={renderOrderItem}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderListHeader}
+        ListEmptyComponent={
+          !_hasHydrated ? (
+            <ActivityIndicator size="large" color="#003B71" />
+          ) : (
+            <Text style={styles.noOrdersText}>Nenhum pedido em cache no momento.</Text>
+          )
+        }
+        contentContainerStyle={styles.scrollViewContent}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={8}
+        removeClippedSubviews
+      />
 
       <OrderDetailsModal
         order={selectedOrder}
