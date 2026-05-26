@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image } from 'react-native';
+import Constants from 'expo-constants';
 import { useNavigation } from '../hooks/useNavigation';
 import { useCachedOrdersStore, CachedOrder } from '../store/useCachedOrdersStore';
 import { OrderItem } from './components/OrderItem';
@@ -13,7 +14,10 @@ import { syncCachedOrdersSpinPrizes } from '../lib/spinPrizeSync';
 
 const closeIcon = require('../assets/images/x.png');
 const backIcon = require('../assets/images/voltar.png');
-const syncWebhookUrl = process.env.EXPO_PUBLIC_SYNC_WEBHOOK_URL;
+const syncWebhookUrl =
+  process.env.EXPO_PUBLIC_SYNC_WEBHOOK_URL ||
+  Constants.expoConfig?.extra?.syncWebhookUrl ||
+  '';
 
 export default function SyncOrdersScreen() {
   const syncTables = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'escalonada', 'relacao_prazo'];

@@ -17,6 +17,10 @@ const extra = {
   ...extraFromJson,
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || extraFromJson.supabaseUrl || '',
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || extraFromJson.supabaseAnonKey || '',
+  syncWebhookUrl:
+    process.env.EXPO_PUBLIC_SYNC_WEBHOOK_URL ||
+    extraFromJson.syncWebhookUrl ||
+    '',
 };
 
 module.exports = () => ({
