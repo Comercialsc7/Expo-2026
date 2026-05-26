@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Platform, Dimensions, FlatList } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Platform, Dimensions } from 'react-native';
+import { router } from 'expo-router';
 import { MovingBorderButton } from '../../components/ui/moving-border';
 import Animated, {
   useAnimatedStyle,
@@ -24,14 +24,6 @@ interface Brand {
   name: string;
   image_url: string | null;
   created_at?: string;
-}
-
-interface Order {
-  id: string;
-  client_name: string;
-  total: number;
-  status: string;
-  created_at: string;
 }
 
 const styles = StyleSheet.create({
@@ -166,6 +158,19 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'contain',
   },
+  brandImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 6,
+  },
+  brandImagePlaceholderText: {
+    fontSize: 10,
+    color: '#999999',
+    fontFamily: 'Montserrat-Regular',
+  },
   brandName: {
     fontSize: 12,
     color: '#003B71',
@@ -182,6 +187,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   productsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 16,
     paddingBottom: 12,
     justifyContent: 'space-between',
@@ -235,6 +242,20 @@ const styles = StyleSheet.create({
     height: 100,
     resizeMode: 'contain',
     marginBottom: 8,
+  },
+  productImagePlaceholder: {
+    width: '100%',
+    height: 100,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 6,
+  },
+  productImagePlaceholderText: {
+    fontSize: 10,
+    color: '#999999',
+    fontFamily: 'Montserrat-Regular',
   },
   productInfo: {
     width: '100%',
@@ -326,6 +347,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat-Regular',
     marginTop: 4,
   },
+  sectionStateText: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    fontSize: 13,
+    color: '#666666',
+    fontFamily: 'Montserrat-Regular',
+  },
+  sectionErrorText: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    fontSize: 13,
+    color: '#C62828',
+    fontFamily: 'Montserrat-Regular',
+  },
 });
 
 export default function OrdersScreen() {
@@ -337,7 +372,6 @@ export default function OrdersScreen() {
   const { navigateTo } = useNavigation();
   const { products, loading: productsLoading, error: productsError } = useProducts();
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [loading, setLoading] = useState(true);
   const [representanteNome, setRepresentanteNome] = useState<string | null>(null);
 
   const menuItems: MenuItem[] = [
@@ -380,10 +414,12 @@ export default function OrdersScreen() {
   }, [banners]);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchRepresentanteData = async () => {
       try {
         const nomeStr = await AsyncStorage.getItem('representanteNome');
-        if (nomeStr) {
+        if (isMounted && nomeStr) {
           setRepresentanteNome(nomeStr);
           console.log('Representante Nome recuperado:', nomeStr);
         }
@@ -391,7 +427,12 @@ export default function OrdersScreen() {
         console.error('Erro ao buscar nome do representante:', error);
       }
     };
+
     fetchRepresentanteData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -407,62 +448,95 @@ export default function OrdersScreen() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchBrands = async () => {
+      let hasCachedBrands = false;
+
+      try {
+        const sqliteBrands = await OfflineSQLiteService.getAll<Brand>('brands');
+        if (sqliteBrands.length > 0 && isMounted) {
+          const sortedSQLiteBrands = [...sqliteBrands].sort((a, b) =>
+            String(a.created_at || '').localeCompare(String(b.created_at || ''))
+          );
+          setBrands(sortedSQLiteBrands);
+          hasCachedBrands = true;
+        }
+
+        const tableStoreBrands = await TableStore.get('brands');
+        if (tableStoreBrands.length > 0 && isMounted) {
+          const sortedTableStoreBrands = [...tableStoreBrands].sort((a: Brand, b: Brand) =>
+            String(a.created_at || '').localeCompare(String(b.created_at || ''))
+          );
+          setBrands(sortedTableStoreBrands as Brand[]);
+          hasCachedBrands = true;
+        }
+      } catch (cacheError) {
+        console.warn('Falha ao carregar marcas do cache local:', cacheError);
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('brands')
+          .select('id, name, image_url, created_at')
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        const onlineBrands = (data as Brand[]) || [];
+        if (isMounted) {
+          setBrands(onlineBrands);
+        }
+
+        if (onlineBrands.length > 0) {
+          await TableStore.set('brands', onlineBrands);
+          await OfflineSQLiteService.replaceTable('brands', onlineBrands);
+        }
+      } catch (onlineError) {
+        if (isMounted && !hasCachedBrands) {
+          console.error('Erro ao buscar marcas:', onlineError);
+          setBrands([]);
+        }
+      }
+    };
+
     fetchBrands();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const fetchBrands = async () => {
-    let hasCachedBrands = false;
+  const acceleratorProducts = useMemo(() => {
+    const onlyAccelerators = products.filter(
+      (product) => String(product.is_acelerator) === 'true' || String(product.is_acelerator) === '1'
+    );
 
-    try {
-      const sqliteBrands = await OfflineSQLiteService.getAll<Brand>('brands');
-      if (sqliteBrands.length > 0) {
-        const sortedSQLiteBrands = [...sqliteBrands].sort((a, b) =>
-          String(a.created_at || '').localeCompare(String(b.created_at || ''))
-        );
-        setBrands(sortedSQLiteBrands);
-        hasCachedBrands = true;
+    const uniqueByCode = new Map<string, (typeof onlyAccelerators)[number]>();
+
+    for (const product of onlyAccelerators) {
+      const code = String(product.code || '').trim();
+      if (!code) continue;
+
+      const existing = uniqueByCode.get(code);
+      if (!existing) {
+        uniqueByCode.set(code, product);
+        continue;
       }
 
-      const tableStoreBrands = await TableStore.get('brands');
-      if (tableStoreBrands.length > 0) {
-        const sortedTableStoreBrands = [...tableStoreBrands].sort((a: Brand, b: Brand) =>
-          String(a.created_at || '').localeCompare(String(b.created_at || ''))
-        );
-        setBrands(sortedTableStoreBrands as Brand[]);
-        hasCachedBrands = true;
-      }
-    } catch (cacheError) {
-      console.warn('Falha ao carregar marcas do cache local:', cacheError);
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('brands')
-        .select('id, name, image_url, created_at')
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      const onlineBrands = (data as Brand[]) || [];
-      setBrands(onlineBrands);
-
-      if (onlineBrands.length > 0) {
-        await TableStore.set('brands', onlineBrands);
-        await OfflineSQLiteService.replaceTable('brands', onlineBrands);
-      }
-    } catch (onlineError) {
-      if (!hasCachedBrands) {
-        console.error('Erro ao buscar marcas:', onlineError);
-        setBrands([]);
+      const currentQtde = Number(product.qtde || 0);
+      const existingQtde = Number(existing.qtde || 0);
+      if (currentQtde < existingQtde) {
+        uniqueByCode.set(code, product);
       }
     }
-  };
 
-  const acceleratorProducts = products.filter(
-    product => String(product.is_acelerator) === 'true' || String(product.is_acelerator) === '1'
-  );
+    return Array.from(uniqueByCode.values()).sort((a, b) =>
+      String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR')
+    );
+  }, [products]);
 
   return (
     <View style={styles.container}>
@@ -530,10 +604,16 @@ export default function OrdersScreen() {
                 style={styles.brandCard}
               >
                 <View style={styles.brandImageContainer}>
-                  <Image
-                    source={brand.image_url ? { uri: brand.image_url } : undefined}
-                    style={styles.brandImage}
-                  />
+                  {brand.image_url ? (
+                    <Image
+                      source={{ uri: brand.image_url }}
+                      style={styles.brandImage}
+                    />
+                  ) : (
+                    <View style={styles.brandImagePlaceholder}>
+                      <Text style={styles.brandImagePlaceholderText}>Sem imagem</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.brandName} numberOfLines={2}>{brand.name}</Text>
               </View>
@@ -546,35 +626,45 @@ export default function OrdersScreen() {
             title="Itens Aceleradores"
             onViewAll={() => navigateTo('/products' as any)}
           />
-          <FlatList
-            data={acceleratorProducts}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item: product }) => (
-              <TouchableOpacity
-                key={product.id}
-                style={styles.productItemGrid}
-                onPress={() => navigateTo('/products' as any)}
-              >
-                <Image
-                  source={product.image_url ? { uri: product.image_url } : undefined}
-                  style={styles.productImage}
-                />
-                <View style={styles.productInfo}>
-                  <Text style={styles.productName}>{product.name}</Text>
-                  <View style={styles.priceContainer}>
-                    <Text style={styles.productPrice}>
-                      R$ {product.price.toFixed(2)}
+          {productsLoading ? (
+            <Text style={styles.sectionStateText}>Carregando itens aceleradores...</Text>
+          ) : productsError ? (
+            <Text style={styles.sectionErrorText}>Erro ao carregar itens aceleradores.</Text>
+          ) : acceleratorProducts.length === 0 ? (
+            <Text style={styles.sectionStateText}>Nenhum item acelerador disponível.</Text>
+          ) : (
+            <View style={styles.productsGrid}>
+              {acceleratorProducts.map((product) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={styles.productItemGrid}
+                  onPress={() => navigateTo('/products' as any)}
+                >
+                  {product.image_url ? (
+                    <Image
+                      source={{ uri: product.image_url }}
+                      style={styles.productImage}
+                    />
+                  ) : (
+                    <View style={styles.productImagePlaceholder}>
+                      <Text style={styles.productImagePlaceholderText}>Sem imagem</Text>
+                    </View>
+                  )}
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName}>{product.name}</Text>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.productPrice}>
+                        R$ {Number(product.price || 0).toFixed(2)}
+                      </Text>
+                    </View>
+                    <Text style={styles.productQuantity}>
+                      {product.emb} - {product.qtde}
                     </Text>
                   </View>
-                  <Text style={styles.productQuantity}>
-                    {product.emb} - {product.qtde}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            numColumns={3}
-            contentContainerStyle={styles.productsGrid}
-          />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={{ height: 20 }} />
