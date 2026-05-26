@@ -337,10 +337,14 @@ export class SyncService {
           const cleanPayload = { ...payload };
           delete cleanPayload._synced;
           delete cleanPayload._id;
+          delete cleanPayload._rev;
           delete cleanPayload._createdAt;
           delete cleanPayload._updatedAt;
           delete cleanPayload._tableStore;
           delete cleanPayload._lastSync;
+          delete cleanPayload.createdAt;
+          delete cleanPayload.updatedAt;
+          delete cleanPayload.table;
 
           const { error } = await supabase.from(table).upsert(cleanPayload);
 
@@ -619,8 +623,12 @@ export class SyncService {
           const cleanPayload = { ...record.payload };
           delete cleanPayload._synced;
           delete cleanPayload._id;
+          delete cleanPayload._rev;
           delete cleanPayload._createdAt;
           delete cleanPayload._updatedAt;
+          delete cleanPayload.createdAt;
+          delete cleanPayload.updatedAt;
+          delete cleanPayload.table;
 
           const { error } = await supabase.from(table).upsert(cleanPayload);
 

@@ -108,6 +108,23 @@ class OfflineSQLiteService {
     return Object.values(table) as T[];
   }
 
+  static async getAllWhere<T = any>(
+    tableName: string,
+    filters: Record<string, string | number>
+  ): Promise<T[]> {
+    await this.init();
+
+    const allRows = await this.getAll<T>(tableName);
+    const entries = Object.entries(filters || {});
+    if (entries.length === 0) {
+      return allRows;
+    }
+
+    return allRows.filter((row: any) =>
+      entries.every(([key, value]) => String(row?.[key]) === String(value))
+    );
+  }
+
   static async clearTable(tableName: string): Promise<void> {
     await this.init();
     const store = this.loadStore();

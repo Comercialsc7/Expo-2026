@@ -24,7 +24,6 @@ export default function SyncOrdersScreen() {
   const [selectedOrder, _setSelectedOrder] = useState<CachedOrder | null>(null);
   const [isDeleteConfirmModalVisible, setIsDeleteConfirmModalVisible] = useState(false);
   const [orderIdToDelete, setOrderIdToDelete] = useState<string | null>(null);
-  const [sentOrders, setSentOrders] = useState<string[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [requiresManualUpdate, setRequiresManualUpdate] = useState(false);
   const [showReconnectNotice, setShowReconnectNotice] = useState(false);
@@ -163,16 +162,27 @@ export default function SyncOrdersScreen() {
       const spinPrizeResult = await syncCachedOrdersSpinPrizes(pendingOrders);
       applySyncedSpinPrizePhotos(spinPrizeResult.synced);
 
+      const hasSpinPrizeFailures = spinPrizeResult.failed.length > 0;
       if (spinPrizeResult.failed.length > 0) {
         console.warn('Falhas ao sincronizar fotos dos prêmios:', spinPrizeResult.failed);
       }
 
       await upload();
+      await refreshPendingCount();
+
+      if (hasSpinPrizeFailures) {
+        Alert.alert(
+          'Sincronização parcial',
+          `Pedidos enviados, mas ${spinPrizeResult.failed.length} item(ns) de foto da roleta falharam. Verifique as policies do bucket.`
+        );
+        return;
+      }
+
       Alert.alert('Sucesso', 'Pendências enviadas com sucesso!');
     } catch (error) {
       Alert.alert('Erro', 'Falha ao enviar pendências. Tente novamente.');
     }
-  }, [applySyncedSpinPrizePhotos, cachedOrders, isOnline, upload]);
+  }, [applySyncedSpinPrizePhotos, cachedOrders, isOnline, refreshPendingCount, upload]);
 
   const handleSyncDownload = useCallback(async () => {
     try {
@@ -288,10 +298,10 @@ export default function SyncOrdersScreen() {
   const renderOrderItem = useCallback(({ item }: { item: CachedOrder }) => (
     <OrderItem
       item={item}
-      enviado={sentOrders.includes(item.id)}
+      enviado={!!item.enviado}
       onPress={setSelectedOrder}
     />
-  ), [sentOrders, setSelectedOrder]);
+  ), [setSelectedOrder]);
 
   const renderListHeader = useCallback(() => (
     <View style={styles.content}>

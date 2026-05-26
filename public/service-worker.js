@@ -74,8 +74,11 @@ const cacheImages = async (request) => {
     }
     return response;
   } catch (error) {
-    console.error('Image fetch failed:', error);
-    throw error;
+    const url = request.url || '';
+    if (!url.includes('via.placeholder.com')) {
+      console.warn('Image fetch failed:', error);
+    }
+    return cached || new Response('', { status: 204, statusText: 'No Content' });
   }
 };
 
