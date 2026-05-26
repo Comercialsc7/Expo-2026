@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
   },
   productItemGrid: {
     // Em web, evita colapso extremo de largura dos cards.
+    position: 'relative',
     flexGrow: 0,
     flexShrink: 0,
     flexBasis: '31%',
@@ -264,6 +265,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#999999',
     fontFamily: 'Montserrat-Regular',
+  },
+  productDiamondBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    resizeMode: 'contain',
+    zIndex: 2,
   },
   productInfo: {
     width: '100%',
@@ -382,11 +392,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#003B71',
     fontFamily: 'Montserrat-Bold',
-  },
-  sectionTitleIcon: {
-    width: 20,
-    height: 20,
-    resizeMode: 'contain',
   },
 });
 
@@ -651,10 +656,9 @@ export default function OrdersScreen() {
         <View style={styles.productsSection}>
           <View style={styles.sectionTitleContainer}>
             <Text style={styles.sectionTitleText}>Itens Aceleradores</Text>
-            <Image source={Diamond} style={styles.sectionTitleIcon} />
             <TouchableOpacity
               style={{ marginLeft: 'auto' }}
-              onPress={() => navigateTo('/products' as any)}
+              onPress={() => navigateTo('/create-order' as any)}
             >
               <Text style={{ fontSize: 13, color: '#0088CC', fontFamily: 'Montserrat-Medium' }}>Ver todos</Text>
             </TouchableOpacity>
@@ -673,6 +677,10 @@ export default function OrdersScreen() {
                   style={styles.productItemGrid}
                   onPress={() => navigateTo('/products' as any)}
                 >
+                  <Image
+                    source={Diamond}
+                    style={styles.productDiamondBadge}
+                  />
                   {product.image_url ? (
                     <Image
                       source={{ uri: product.image_url }}
