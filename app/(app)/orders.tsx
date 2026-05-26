@@ -19,6 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../lib/TableStore';
 import OfflineSQLiteService from '../../lib/OfflineSQLiteService';
 
+const Diamond = require('../../assets/images/diamond.png');
+
 interface Brand {
   id: string;
   name: string;
@@ -369,6 +371,23 @@ const styles = StyleSheet.create({
     color: '#C62828',
     fontFamily: 'Montserrat-Regular',
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  sectionTitleText: {
+    fontSize: 16,
+    color: '#003B71',
+    fontFamily: 'Montserrat-Bold',
+  },
+  sectionTitleIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
 });
 
 export default function OrdersScreen() {
@@ -630,10 +649,16 @@ export default function OrdersScreen() {
         </View>
 
         <View style={styles.productsSection}>
-          <SectionHeader
-            title="Itens Aceleradores"
-            onViewAll={() => navigateTo('/products' as any)}
-          />
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionTitleText}>Itens Aceleradores</Text>
+            <Image source={Diamond} style={styles.sectionTitleIcon} />
+            <TouchableOpacity
+              style={{ marginLeft: 'auto' }}
+              onPress={() => navigateTo('/products' as any)}
+            >
+              <Text style={{ fontSize: 13, color: '#0088CC', fontFamily: 'Montserrat-Medium' }}>Ver todos</Text>
+            </TouchableOpacity>
+          </View>
           {productsLoading ? (
             <Text style={styles.sectionStateText}>Carregando itens aceleradores...</Text>
           ) : productsError ? (
