@@ -157,6 +157,18 @@ export default function Login() {
     await AsyncStorage.setItem('codigosRepresentante', JSON.stringify(updatedHistory));
   };
 
+  const blurFocusedElementWeb = () => {
+    if (Platform.OS !== 'web') return;
+    try {
+      const activeElement = document.activeElement as HTMLElement | null;
+      if (activeElement && typeof activeElement.blur === 'function') {
+        activeElement.blur();
+      }
+    } catch {
+      // Ignora falhas de blur no ambiente web.
+    }
+  };
+
   const handleLogin = async () => {
     console.log('Selected Team:', selectedTeam);
     console.log('Code:', code);
@@ -236,6 +248,7 @@ export default function Login() {
           { clients: { equipe: Number(selectedTeam), repre: representativeCode } }
         ).catch(console.error);
 
+        blurFocusedElementWeb();
         router.push('/(app)/orders');
         return;
 
@@ -276,6 +289,7 @@ export default function Login() {
           await saveRepresentativeHistory(representativeCode);
 
           console.log('✅ Login Offline Sucesso');
+          blurFocusedElementWeb();
           router.push('/(app)/orders');
         } else {
           Alert.alert('Erro Login Offline', 'Usuário não encontrado no cache local. Verifique os dados ou conecte-se à internet.');

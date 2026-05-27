@@ -163,6 +163,7 @@ export async function syncCachedOrdersSpinPrizes(orders: CachedOrder[]): Promise
         subtotal: order.subtotal,
         desconto: order.discount,
         total: order.total,
+        tickets_moto: order.ticketsMoto ?? 0,
         prazo_pagamento: order.paymentTerm?.description || '',
         premio_tipo: firstPrize?.type || null,
         premio_descricao: firstPrize?.description || null,

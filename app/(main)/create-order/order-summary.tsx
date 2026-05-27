@@ -83,6 +83,7 @@ export default function OrderSummaryScreen() {
       subtotal: subtotal,
       total: total,
       discount: desconto,
+      ticketsMoto: cuponsGanhos,
       sellerCode: sellerCode || '',
       email: email,
       enviado: false,

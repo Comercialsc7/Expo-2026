@@ -117,6 +117,10 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
                 <Text style={styles.valueLabel}>Total:</Text>
                 <Text style={styles.valueAmount}>{formatCurrency(order.total)}</Text>
               </View>
+              <View style={styles.valueRow}>
+                <Text style={styles.valueLabel}>Tickets Moto:</Text>
+                <Text style={styles.valueAmount}>{order.ticketsMoto ?? 0}</Text>
+              </View>
             </View>
 
             {prizesToShow.length > 0 && (

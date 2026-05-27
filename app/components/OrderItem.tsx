@@ -45,6 +45,9 @@ export const OrderItem: React.FC<OrderItemProps> = React.memo(({ item, onPress, 
       <Text style={styles.orderValue}>
         Total: {formatCurrency(item.total)}
       </Text>
+      <Text style={styles.orderValue}>
+        Tickets Moto: {item.ticketsMoto ?? 0}
+      </Text>
       {item.discount > 0 && (
         <Text style={styles.orderDiscount}>
           Desconto: {formatCurrency(item.discount)}

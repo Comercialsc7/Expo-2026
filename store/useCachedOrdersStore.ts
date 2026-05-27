@@ -26,6 +26,7 @@ export interface CachedOrder {
   userId?: string;
   spinPrize?: SpinPrizeEntry;
   spinPrizes?: SpinPrizeEntry[];
+  ticketsMoto?: number;
   email?: string;
   enviado?: boolean;
 }

@@ -109,9 +109,19 @@ class OfflineCache {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
 
-      if (error || !session) {
-        console.warn('[OfflineCache] Nenhuma sessão ativa');
+      if (error) {
+        console.warn('[OfflineCache] Falha ao consultar sessão Supabase:', error.message);
         return false;
+      }
+
+      // Este app usa login custom via tabela users em parte do fluxo.
+      // Quando não existe sessão do Supabase Auth, não deve contar como erro.
+      if (!session) {
+        await AsyncStorage.setItem(
+          this.KEYS.SESSION_LAST_VALIDATED_AT,
+          new Date().toISOString()
+        );
+        return true;
       }
 
       // Salva sessão completa
@@ -235,13 +245,15 @@ class OfflineCache {
       const sessionJson = await AsyncStorage.getItem(this.KEYS.SESSION);
       const cachedAt = await AsyncStorage.getItem(this.KEYS.CACHED_AT);
       const tablesJson = await AsyncStorage.getItem(this.KEYS.TABLES_CACHED);
+      const representativeCode = await AsyncStorage.getItem('representativeCodeToStore');
 
       const hasSession = !!sessionJson;
+      const hasCustomLogin = !!representativeCode;
       const tables = tablesJson ? JSON.parse(tablesJson) : [];
 
       return {
-        ready: hasSession && tables.length > 0,
-        session: hasSession,
+        ready: (hasSession || hasCustomLogin) && tables.length > 0,
+        session: hasSession || hasCustomLogin,
         tablesCount: tables.length,
         cachedAt,
       };
