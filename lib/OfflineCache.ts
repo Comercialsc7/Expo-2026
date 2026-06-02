@@ -38,6 +38,7 @@ class OfflineCache {
   }> {
     const cached: string[] = [];
     const errors: string[] = [];
+    const successfulTables: string[] = [];
 
     try {
       // Log masked Supabase source for debugging (env vs app.json)
@@ -70,6 +71,7 @@ class OfflineCache {
           try {
             const count = await this.cacheTable(table, tableFilters[table]);
             cached.push(`${table} (${count} registros)`);
+            successfulTables.push(table);
             console.log(`✅ [OfflineCache] ${table}: ${count} registros em cache`);
           } catch (error) {
             errors.push(table);
@@ -85,7 +87,7 @@ class OfflineCache {
       );
       await AsyncStorage.setItem(
         this.KEYS.TABLES_CACHED,
-        JSON.stringify(tables)
+        JSON.stringify(successfulTables)
       );
 
       const success = errors.length === 0;

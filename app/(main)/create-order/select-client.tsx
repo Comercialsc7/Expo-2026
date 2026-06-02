@@ -6,6 +6,7 @@ import { useOrderStore, Client, PaymentTerm } from '../../../store/useOrderStore
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../../lib/TableStore';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
+import SQLiteStore from '../../../lib/SQLiteStore';
 
 const mergeByKey = (
   existing: any[],
@@ -42,6 +43,23 @@ export default function SelectClient() {
   const [codigoRepresentanteFiltro, setCodigoRepresentanteFiltro] = useState<string | null>(null);
 
   const { setClient } = useOrderStore();
+
+  const readTableWithFallbacks = useCallback(async (tableName: string): Promise<any[]> => {
+    const sqliteRows = await OfflineSQLiteService.getAll(tableName);
+    if (sqliteRows.length > 0) {
+      return sqliteRows;
+    }
+
+    const localDbRows = await SQLiteStore.getAll(tableName);
+    const localDbPayloads = localDbRows
+      .map((row) => row?.payload)
+      .filter(Boolean);
+    if (localDbPayloads.length > 0) {
+      return localDbPayloads;
+    }
+
+    return TableStore.get(tableName);
+  }, []);
 
   useEffect(() => {
     const loadFilters = async () => {
@@ -86,6 +104,7 @@ export default function SelectClient() {
           const mergedRelacaoPrazo = mergeByKey(existingRelacaoPrazo, relacaoPrazo, 'id');
           await TableStore.set('relacao_prazo', mergedRelacaoPrazo);
           await OfflineSQLiteService.upsertMany('relacao_prazo', relacaoPrazo);
+          await SQLiteStore.upsertMany('relacao_prazo', relacaoPrazo);
         } catch (cacheError) {
           console.warn('⚠️ Falha ao persistir relacao_prazo no cache local:', cacheError);
         }
@@ -112,6 +131,7 @@ export default function SelectClient() {
           const mergedPrazos = mergeByKey(existingPrazos, prazos, 'id');
           await TableStore.set('prazos', mergedPrazos);
           await OfflineSQLiteService.upsertMany('prazos', prazos);
+          await SQLiteStore.upsertMany('prazos', prazos);
         } catch (cacheError) {
           console.warn('⚠️ Falha ao persistir prazos no cache local:', cacheError);
         }
@@ -125,16 +145,8 @@ export default function SelectClient() {
     } catch (error) {
       console.warn('⚠️ Falha ao buscar prazos online. Usando cache local...', error);
 
-      const relacaoPrazoLocal = await OfflineSQLiteService.getAll('relacao_prazo');
-      const prazosLocal = await OfflineSQLiteService.getAll('prazos');
-
-      const relacaoPrazoFallback = relacaoPrazoLocal.length > 0
-        ? relacaoPrazoLocal
-        : await TableStore.get('relacao_prazo');
-
-      const prazosFallback = prazosLocal.length > 0
-        ? prazosLocal
-        : await TableStore.get('prazos');
+      const relacaoPrazoFallback = await readTableWithFallbacks('relacao_prazo');
+      const prazosFallback = await readTableWithFallbacks('prazos');
 
       const relacoesCliente = relacaoPrazoFallback.filter(
         (item: any) => String(item.codcli) === String(clientCode)
@@ -156,7 +168,7 @@ export default function SelectClient() {
           prazo_dias: prazo.dias,
         }));
     }
-  }, []);
+  }, [readTableWithFallbacks]);
 
   const fetchClients = async () => {
     if (codigoEquipeFiltro === null || codigoRepresentanteFiltro === null) {
