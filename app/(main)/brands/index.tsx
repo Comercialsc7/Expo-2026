@@ -13,7 +13,6 @@ interface Brand {
 export default function BrandsScreen() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchBrands();
@@ -30,8 +29,6 @@ export default function BrandsScreen() {
       setBrands(data || []);
     } catch (error) {
       console.error('Erro ao buscar marcas:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

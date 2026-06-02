@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+import 'expo-router/entry';
+
 // Polyfills para libs web que ainda dependem de globais do Node/Browser antigo
 if (typeof global === 'undefined') {
     window.global = window;
@@ -11,5 +13,3 @@ if (Platform.OS === 'web' && typeof window !== 'undefined') {
         nextTick: (cb) => setTimeout(cb, 0)
     };
 }
-
-import 'expo-router/entry';

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
-import { useOrderStore, ClientPaymentTerm, PaymentTerm } from '../../../store/useOrderStore';
+import { useOrderStore, PaymentTerm } from '../../../store/useOrderStore';
 
 export default function PaymentMethodScreen() {
   const { client, setPaymentTerm: setOrderPaymentTerm } = useOrderStore();
@@ -17,7 +17,7 @@ export default function PaymentMethodScreen() {
     } else {
       setLoading(false);
     }
-  }, [client?.payment_terms]);
+  }, [client?.payment_terms, setOrderPaymentTerm]);
 
   const handleSelectTerm = (term: PaymentTerm) => {
     setSelectedTerm(term);

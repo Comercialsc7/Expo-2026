@@ -57,7 +57,7 @@ export default function BrandManagement() {
       let imageUrl = null;
       if (image) {
         const fileName = `${Date.now()}.jpg`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('brands')
           .upload(fileName, {
             uri: image,

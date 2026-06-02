@@ -266,12 +266,12 @@ export class SyncService {
   static async upload(config?: Partial<SyncConfig>, emitLifecycle: boolean = true): Promise<{
     success: number;
     failed: number;
-    errors: Array<{ table: string; error: Error }>;
+    errors: { table: string; error: Error }[];
   }> {
     const results = {
       success: 0,
       failed: 0,
-      errors: [] as Array<{ table: string; error: Error }>,
+      errors: [] as { table: string; error: Error }[],
     };
 
     const uploadTimestamp = new Date().toISOString();
@@ -411,11 +411,11 @@ export class SyncService {
 
   static async download(config: SyncConfig, emitLifecycle: boolean = true): Promise<{
     downloaded: Record<string, number>;
-    errors: Array<{ table: string; error: Error }>;
+    errors: { table: string; error: Error }[];
   }> {
     const results = {
       downloaded: {} as Record<string, number>,
-      errors: [] as Array<{ table: string; error: Error }>,
+      errors: [] as { table: string; error: Error }[],
     };
 
     const downloadTimestamp = new Date().toISOString();
@@ -543,11 +543,11 @@ export class SyncService {
     upload: {
       success: number;
       failed: number;
-      errors: Array<{ table: string; error: Error }>;
+      errors: { table: string; error: Error }[];
     };
     download: {
       downloaded: Record<string, number>;
-      errors: Array<{ table: string; error: Error }>;
+      errors: { table: string; error: Error }[];
     };
   }> {
     if (this.isSyncing) {
@@ -606,12 +606,12 @@ export class SyncService {
   static async uploadTable(table: string): Promise<{
     success: number;
     failed: number;
-    errors: Array<{ error: Error }>;
+    errors: { error: Error }[];
   }> {
     const results = {
       success: 0,
       failed: 0,
-      errors: [] as Array<{ error: Error }>,
+      errors: [] as { error: Error }[],
     };
 
     try {
@@ -755,11 +755,11 @@ export class SyncService {
   /**
    * Retorna metadados de sincronização de todas as tabelas
    */
-  static async getAllSyncMetadata(): Promise<Array<{
+  static async getAllSyncMetadata(): Promise<{
     table: string;
     last_upload_at: string | null;
     last_download_at: string | null;
-  }>> {
+  }[]> {
     try {
       const records = await SQLiteStore.getAll(this.SYNC_META_TABLE);
       return records.map(r => ({

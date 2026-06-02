@@ -443,7 +443,7 @@ export default function OrdersScreen() {
     }, 18000);
 
     return () => clearInterval(interval);
-  }, [banners]);
+  }, [banners, fadeAnim]);
 
   useEffect(() => {
     let isMounted = true;

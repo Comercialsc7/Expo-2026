@@ -5,7 +5,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useSpinResultsStore } from '../../../store/useSpinResultsStore';
 import { optimizeImage } from '../../../lib/imageUtils';
-import { supabase } from '../../../lib/supabase';
 
 const premios = [
   'Kit Churrasco 14 peças Tramontina',
@@ -14,17 +13,9 @@ const premios = [
   'Não foi dessa vez'
 ];
 
-interface Prize {
-  id: string;
-  name: string;
-  image_url: string;
-}
-
 export default function SpinWheelScreen() {
   const [selected, setSelected] = useState(-1);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [selectedPrize, setSelectedPrize] = useState<Prize | null>(null);
-  const [loading, setLoading] = useState(false);
   const params = useLocalSearchParams();
   const girosDisponiveis = Math.min(5, Number(params.girosDisponiveis) || 0);
 
@@ -41,6 +32,7 @@ export default function SpinWheelScreen() {
         handleConfirmGiro();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, capturedImage]);
 
   const takePhoto = async () => {
@@ -112,60 +104,6 @@ export default function SpinWheelScreen() {
         prazo: params.prazo,
       }
     });
-  };
-
-  const handleTakePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Precisamos da permissão para acessar a câmera.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setCapturedImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Erro ao tirar foto:', error);
-      alert('Erro ao tirar foto. Tente novamente.');
-    }
-  };
-
-  const handleConfirm = async () => {
-    if (!selectedPrize || !capturedImage) {
-      alert('Por favor, selecione um prêmio e tire uma foto.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Aqui você implementaria a lógica para salvar o prêmio e a foto no banco de dados
-      // Por exemplo:
-      // const fileName = `${Date.now()}.jpg`;
-      // const { data: uploadData, error: uploadError } = await supabase.storage
-      //   .from('prizes')
-      //   .upload(fileName, {
-      //     uri: capturedImage,
-      //     type: 'image/jpeg',
-      //     name: fileName,
-      //   });
-
-      // if (uploadError) throw uploadError;
-
-      router.push('/create-order/complete');
-    } catch (error) {
-      console.error('Erro ao confirmar prêmio:', error);
-      alert('Erro ao confirmar prêmio. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (

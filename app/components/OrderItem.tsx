@@ -57,4 +57,6 @@ export const OrderItem: React.FC<OrderItemProps> = React.memo(({ item, onPress, 
   </TouchableOpacity>
 ));
 
+OrderItem.displayName = 'OrderItem';
+
 export default OrderItem; 

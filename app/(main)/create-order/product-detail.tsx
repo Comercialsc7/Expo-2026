@@ -17,12 +17,12 @@ const normalizeCode = (value: unknown): string => {
   return raw.replace(/^0+/, '') || '0';
 };
 
-const buildCodeCandidates = (value: string): Array<string | number> => {
+const buildCodeCandidates = (value: string): (string | number)[] => {
   const trimmed = String(value || '').trim();
   if (!trimmed) return [];
 
   const set = new Set<string>();
-  const candidates: Array<string | number> = [];
+  const candidates: (string | number)[] = [];
   const pushString = (v: string) => {
     const key = `s:${v}`;
     if (!set.has(key)) {

@@ -37,6 +37,6 @@ try {
   const maskedKey = supabaseAnonKey ? `${supabaseAnonKey.slice(0, 8)}...${supabaseAnonKey.slice(-8)}` : '<missing>';
   console.debug('[supabase] Using URL:', maskedUrl);
   console.debug('[supabase] Anon Key (masked):', maskedKey);
-} catch (e) {
+} catch {
   // ignore logging errors
 }

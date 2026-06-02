@@ -278,7 +278,9 @@ export default function Login() {
         // Busca no cache (mesma lógica do banco)
         // Nota: O cache do TableStore salva os objetos como eram no banco
         const foundUser = cachedUsers.find(
-          (u: any) => String(u.user_id) === String(code) && (u.team_id == selectedTeam || u.team_code == selectedTeam) // Flexibilidade na busca
+          (u: any) =>
+            String(u.user_id) === String(code) &&
+            (String(u.team_id) === String(selectedTeam) || String(u.team_code) === String(selectedTeam)) // Flexibilidade na busca
         );
 
         if (foundUser) {

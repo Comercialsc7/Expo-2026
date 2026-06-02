@@ -27,7 +27,7 @@ export interface QueueProcessResult {
   processed: number;
   succeeded: number;
   failed: number;
-  errors: Array<{ id: number; table: string; error: string }>;
+  errors: { id: number; table: string; error: string }[];
 }
 
 class OfflineMutationQueue {

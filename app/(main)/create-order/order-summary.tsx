@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useSpinResultsStore } from '../../../store/useSpinResultsStore';
 import { useNavigation } from '../../../hooks/useNavigation';
 import { useOrderStore, OrderItem } from '../../../store/useOrderStore';
@@ -9,11 +9,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateSpins } from '../../../lib/spinRewards';
 import { generateShortOrderNumber } from '../../../lib/orderNumber';
 import type { SpinPrizeEntry } from '../../../store/useCachedOrdersStore';
-
-interface SpinResult {
-  prize: string;
-  photoUri?: string;
-}
 
 const Diamond = require('../../../assets/images/diamond.png');
 
@@ -108,7 +103,7 @@ export default function OrderSummaryScreen() {
     return () => {
       clearResults();
     };
-  }, []);
+  }, [clearResults]);
 
   return (
     <View style={styles.screen}>

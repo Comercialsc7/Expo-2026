@@ -1,29 +1,10 @@
-import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { useOrderStore } from '../../../store/useOrderStore';
 
-interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
-  price: number;
-  image?: string;
-  isAccelerator: boolean;
-  box: number;
-  discount: number;
-}
-
 export default function OrderSummary() {
   console.log('OrderSummary component carregado e atualizado!');
-  const { items, client, paymentTerm, removeItem, updateItemQuantity, clearOrder } = useOrderStore();
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    // Optionally clear order when component mounts for a new order flow
-    // or load existing order if continuing from a previous session
-    // For now, we assume a new order is being created or continued from product selection.
-  }, []);
+  const { items, paymentTerm, removeItem, updateItemQuantity } = useOrderStore();
 
   const handleGoBack = () => {
     router.back();

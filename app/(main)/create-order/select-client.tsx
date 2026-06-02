@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { useOrderStore, Client, ClientPaymentTerm, PaymentTerm } from '../../../store/useOrderStore';
+import { useOrderStore, Client, PaymentTerm } from '../../../store/useOrderStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../../lib/TableStore';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
@@ -38,7 +38,6 @@ export default function SelectClient() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
   const [codigoEquipeFiltro, setCodigoEquipeFiltro] = useState<number | null>(null);
   const [codigoRepresentanteFiltro, setCodigoRepresentanteFiltro] = useState<string | null>(null);
 
@@ -69,6 +68,7 @@ export default function SelectClient() {
       console.log('Filtros de cliente carregados:', { equipe: codigoEquipeFiltro, repre: codigoRepresentanteFiltro });
       fetchClients();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codigoEquipeFiltro, codigoRepresentanteFiltro]);
 
   const getPaymentTermsWithFallback = useCallback(async (clientCode: string): Promise<PaymentTerm[]> => {
@@ -160,7 +160,6 @@ export default function SelectClient() {
 
   const fetchClients = async () => {
     if (codigoEquipeFiltro === null || codigoRepresentanteFiltro === null) {
-      setLoading(false);
       return;
     }
 
@@ -239,7 +238,6 @@ export default function SelectClient() {
         console.error('Erro ao buscar clientes no cache local:', cacheError);
       }
     } finally {
-      setLoading(false);
     }
   };
 

@@ -1,15 +1,8 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Animated, {
-  SlideInUp,
-  Layout,
-  FadeIn
-} from 'react-native-reanimated';
 import { usePaymentTermsStore } from '../../../store/usePaymentTermsStore';
 import { useProducts, UniqueProductOption } from '../../../hooks/useProducts';
-
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const Diamond = require('../../../assets/images/diamond.png');
 
@@ -26,7 +19,7 @@ interface Product {
 export default function ProductSearch() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
-  const { clientId, clientName, paymentTermId } = useLocalSearchParams();
+  const { paymentTermId } = useLocalSearchParams();
   const paymentTerms = usePaymentTermsStore(state => state.paymentTerms);
   const selectedPaymentTerm = paymentTerms.find(term => term.id === paymentTermId);
   const { suppliers, getUniqueProductsBySupplier, loading, error } = useProducts();

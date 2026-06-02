@@ -26,7 +26,7 @@ export function MovingBorderButton({ onPress, children, style }: MovingBorderBut
       -1,
       false
     );
-  }, []);
+  }, [rotation]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import SQLiteStore from '../lib/SQLiteStore';
+import SyncService from '../lib/SyncService';
+
 const upsertMock: any = vi.fn(async () => ({ error: null }));
 const gtMock: any = vi.fn(async () => ({ data: [], error: null }));
 const selectMock: any = vi.fn(() => ({
@@ -17,9 +20,6 @@ vi.mock('../lib/supabase', () => {
     },
   };
 });
-
-import SQLiteStore from '../lib/SQLiteStore';
-import SyncService from '../lib/SyncService';
 
 describe('Offline order queue and reconnection sync', () => {
   beforeEach(async () => {

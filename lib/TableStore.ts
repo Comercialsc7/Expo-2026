@@ -333,7 +333,7 @@ class TableStore {
    */
   static async batchUpdate(
     table: string,
-    updates: Array<{ id: string; changes: any }>
+    updates: { id: string; changes: any }[]
   ): Promise<number> {
     try {
       debugLog(`✏️ [TableStore] BATCH UPDATE em '${table}' (${updates.length} registros)`);

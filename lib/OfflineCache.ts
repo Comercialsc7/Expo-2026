@@ -48,7 +48,7 @@ class OfflineCache {
         const masked = used ? used.replace(/(https?:\/\/)([^@\/]+)@?/, '$1****@') : '<missing>';
         const source = envUrl ? 'process.env' : (configUrl ? 'app.json.extra' : 'none');
         console.debug(`🔍 [OfflineCache] Supabase URL source: ${source}; value: ${masked}`);
-      } catch (e) {
+      } catch {
         // ignore logging errors
       }
 
@@ -318,7 +318,7 @@ class OfflineCache {
       const diffMinutes = (now.getTime() - cacheDate.getTime()) / 60000;
 
       return diffMinutes > maxAgeMinutes;
-    } catch (error) {
+    } catch {
       return true;
     }
   }
@@ -381,7 +381,7 @@ class OfflineCache {
       }
 
       return false;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

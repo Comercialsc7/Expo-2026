@@ -6,7 +6,6 @@ import Animated, {
   useSharedValue,
   withSpring
 } from 'react-native-reanimated';
-import { router } from 'expo-router';
 
 export interface MenuItem {
   title: string;
@@ -53,7 +52,7 @@ export function Sidebar({
         stiffness: 90,
       });
     }
-  }, [isOpen, width]);
+  }, [isOpen, width, translateX]);
 
   const sidebarStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],

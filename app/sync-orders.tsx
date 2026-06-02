@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image } from 'react-native';
 import Constants from 'expo-constants';
 import { useNavigation } from '../hooks/useNavigation';
@@ -20,7 +20,10 @@ const syncWebhookUrl =
   '';
 
 export default function SyncOrdersScreen() {
-  const syncTables = ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'escalonada', 'relacao_prazo'];
+  const syncTables = useMemo(
+    () => ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'escalonada', 'relacao_prazo'],
+    []
+  );
 
   const { goBack } = useNavigation();
   const { cachedOrders, _hasHydrated, removeCachedOrder, updateCachedOrder } = useCachedOrdersStore();
@@ -187,7 +190,7 @@ export default function SyncOrdersScreen() {
   }, [blurActiveElementOnWeb]);
 
   const applySyncedSpinPrizePhotos = useCallback((
-    syncedOrders: Array<{ orderId: string; publicUrl: string | null; publicUrls?: string[] }>,
+    syncedOrders: { orderId: string; publicUrl: string | null; publicUrls?: string[] }[],
   ) => {
     syncedOrders.forEach(({ orderId, publicUrl, publicUrls }) => {
       updateCachedOrder(orderId, (order) => ({
@@ -243,7 +246,7 @@ export default function SyncOrdersScreen() {
       }
 
       Alert.alert('Sucesso', 'Pendências enviadas com sucesso!');
-    } catch (error) {
+    } catch {
       Alert.alert('Erro', 'Falha ao enviar pendências. Tente novamente.');
     }
   }, [applySyncedSpinPrizePhotos, cachedOrders, isOnline, refreshPendingCount, scheduleDelayedSyncWebhook, upload]);
@@ -257,7 +260,7 @@ export default function SyncOrdersScreen() {
       setRequiresManualUpdate(false);
       setShowReconnectNotice(false);
       setLastNoticeDismissAt(null);
-    } catch (error) {
+    } catch {
       Alert.alert('Erro', 'Falha ao baixar dados. Tente novamente.');
     }
   }, [download, syncTables]);
@@ -281,7 +284,7 @@ export default function SyncOrdersScreen() {
       await upload();
 
       const downloadedTables: string[] = [];
-      const failedTables: Array<{ table: string; message: string }> = [];
+      const failedTables: { table: string; message: string }[] = [];
 
       // 2) Força download completo de cada tabela crítica para garantir cache offline
       for (const table of syncTables) {
@@ -320,7 +323,7 @@ export default function SyncOrdersScreen() {
     }
   }, [applySyncedSpinPrizePhotos, cachedOrders, downloadTable, isOnline, upload, syncTables]);
 
-  const renderSyncStatus = () => {
+  const renderSyncStatus = useCallback(() => {
     if (!syncing && !syncError && !message) return null;
 
     return (
@@ -357,7 +360,7 @@ export default function SyncOrdersScreen() {
         )}
       </View>
     );
-  };
+  }, [message, progress, syncError, syncing, total]);
 
   const renderOrderItem = useCallback(({ item }: { item: CachedOrder }) => (
     <OrderItem
@@ -374,7 +377,7 @@ export default function SyncOrdersScreen() {
       {showReconnectNotice && requiresManualUpdate && isOnline && (
         <View style={styles.reconnectNotice}>
           <Text style={styles.reconnectNoticeText}>
-            Conexão restabelecida. Realize "Atualizar Dados" para recarregar o cache offline.
+            Conexão restabelecida. Realize &quot;Atualizar Dados&quot; para recarregar o cache offline.
           </Text>
           <TouchableOpacity
             onPress={dismissReconnectNotice}

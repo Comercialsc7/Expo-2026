@@ -14,7 +14,7 @@ interface SyncedSpinPrizeOrder {
 
 interface SyncSpinPrizeResult {
   synced: SyncedSpinPrizeOrder[];
-  failed: Array<{ orderId: string; error: Error }>;
+  failed: { orderId: string; error: Error }[];
 }
 
 const isRemoteUrl = (value?: string) => !!value && /^https?:\/\//i.test(value);

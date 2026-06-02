@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
-import { LucideIcon } from 'lucide-react-native';
+import { ChevronRight , LucideIcon } from 'lucide-react-native';
 
 interface SettingsOptionCardProps {
   title: string;

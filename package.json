@@ -10,7 +10,8 @@
     "start": "npx expo start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "npx expo lint",
+    "lint": "npx eslint . --quiet",
+    "lint:all": "npx eslint .",
     "android": "npx expo run:android",
     "ios": "npx expo run:ios"
   },
@@ -53,6 +54,8 @@
     "babel-plugin-module-resolver": "^5.0.2",
     "cross-env": "^7.0.3",
     "dotenv": "^17.2.3",
+    "eslint": "^9.39.1",
+    "eslint-config-expo": "~9.2.0",
     "typescript": "^5.3.3",
     "vitest": "^3.2.4"
   },

@@ -59,7 +59,7 @@ export const useAuth = () => {
     try {
       // Tenta fazer logout online
       await supabase.auth.signOut();
-    } catch (error) {
+    } catch {
       console.log('Logout offline');
     }
 

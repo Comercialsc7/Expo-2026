@@ -148,4 +148,6 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
   );
 });
 
+OrderDetailsModal.displayName = 'OrderDetailsModal';
+
 export default OrderDetailsModal;

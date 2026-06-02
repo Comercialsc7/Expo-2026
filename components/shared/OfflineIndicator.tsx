@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Platform, Animated } from 'react-native';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { WifiOff, Wifi } from 'lucide-react-native';
@@ -6,7 +6,7 @@ import { WifiOff, Wifi } from 'lucide-react-native';
 export function OfflineIndicator() {
   const isOnline = useOnlineStatus();
   const [showOnlineBadge, setShowOnlineBadge] = useState(false);
-  const fadeAnim = new Animated.Value(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isOnline && !showOnlineBadge) {
@@ -29,7 +29,7 @@ export function OfflineIndicator() {
         setShowOnlineBadge(false);
       });
     }
-  }, [isOnline]);
+  }, [fadeAnim, isOnline, showOnlineBadge]);
 
   if (Platform.OS !== 'web') {
     return null;
