@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   productItem: {
     marginRight: 16,
@@ -395,7 +395,8 @@ export default function OrdersScreen() {
   const fadeAnim = useSharedValue(1);
   const { width: screenWidth } = useWindowDimensions();
   const gridHorizontalPadding = 32;
-  const gridColumnGap = 8;
+  const gridColumnGap = 12;
+  const gridRowGap = 12;
   const productCardWidth = Math.max(
     86,
     Math.floor((screenWidth - gridHorizontalPadding - gridColumnGap * 2) / 3)
@@ -671,10 +672,17 @@ export default function OrdersScreen() {
             <Text style={styles.sectionStateText}>Nenhum item acelerador disponível.</Text>
           ) : (
             <View style={styles.productsGrid}>
-              {acceleratorProducts.map((product) => (
+              {acceleratorProducts.map((product, index) => (
                 <TouchableOpacity
                   key={product.id}
-                  style={[styles.productItemGrid, { width: productCardWidth }]}
+                  style={[
+                    styles.productItemGrid,
+                    {
+                      width: productCardWidth,
+                      marginRight: (index + 1) % 3 === 0 ? 0 : gridColumnGap,
+                      marginBottom: gridRowGap,
+                    },
+                  ]}
                   onPress={() => navigateTo('/create-order' as any)}
                 >
                   <Image
