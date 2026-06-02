@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Image, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useOrderStore, Client, PaymentTerm } from '../../../store/useOrderStore';
@@ -305,24 +305,25 @@ export default function SelectClient() {
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Image source={require('../../../assets/images/buscar.png')} style={{ width: 30, height: 30 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar clientes..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-        />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar clientes..."
+            value={searchQuery}
+            onChangeText={handleSearch}
+          />
         </View>
+        <Text style={styles.resultCount}>{filteredClients.length} cliente(s)</Text>
       </View>
 
       <FlatList
         data={filteredClients}
         renderItem={renderClientItem}
-        keyExtractor={(item) => `${item.id}:${item.code}:${String(item.equipe ?? '')}:${String(item.repre ?? '')}`}
+        keyExtractor={(item, index) => `${item.id ?? 'no-id'}:${item.code ?? 'no-code'}:${String(item.equipe ?? '')}:${String(item.repre ?? '')}:${index}`}
         initialNumToRender={20}
         maxToRenderPerBatch={20}
         updateCellsBatchingPeriod={50}
         windowSize={10}
-        removeClippedSubviews
+        removeClippedSubviews={Platform.OS !== 'web'}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -367,6 +368,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     color: '#003B71',
+    fontFamily: 'Montserrat-Regular',
+  },
+  resultCount: {
+    marginTop: 8,
+    marginLeft: 4,
+    fontSize: 12,
+    color: '#666666',
     fontFamily: 'Montserrat-Regular',
   },
   list: {

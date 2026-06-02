@@ -7,10 +7,15 @@ export function OfflineIndicator() {
   const isOnline = useOnlineStatus();
   const [showOnlineBadge, setShowOnlineBadge] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const wasOnlineRef = useRef<boolean>(isOnline);
 
   useEffect(() => {
-    if (isOnline && !showOnlineBadge) {
-      // Mostra o badge "Online" por 3 segundos quando a conexão volta
+    const wasOnline = wasOnlineRef.current;
+    wasOnlineRef.current = isOnline;
+
+    // Exibe o badge apenas na transição offline -> online.
+    if (!wasOnline && isOnline) {
+      fadeAnim.setValue(0);
       setShowOnlineBadge(true);
 
       Animated.sequence([
@@ -29,7 +34,7 @@ export function OfflineIndicator() {
         setShowOnlineBadge(false);
       });
     }
-  }, [fadeAnim, isOnline, showOnlineBadge]);
+  }, [fadeAnim, isOnline]);
 
   if (Platform.OS !== 'web') {
     return null;
