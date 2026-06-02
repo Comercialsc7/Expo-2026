@@ -21,7 +21,7 @@ const syncWebhookUrl =
 
 export default function SyncOrdersScreen() {
   const syncTables = useMemo(
-    () => ['pedidos', 'products', 'clients', 'teams', 'brands', 'users', 'prazos', 'escalonada', 'relacao_prazo'],
+    () => ['teams', 'users', 'brands', 'prazos', 'relacao_prazo', 'clients', 'products', 'escalonada', 'pedidos'],
     []
   );
 
@@ -254,7 +254,7 @@ export default function SyncOrdersScreen() {
   const handleSyncDownload = useCallback(async () => {
     try {
       // Download completo dos dados necessários para operação offline
-      await download(syncTables, 60000);
+      await download(syncTables, 180000);
 
       Alert.alert('Sucesso', 'Dados atualizados do servidor!');
       setRequiresManualUpdate(false);
@@ -289,7 +289,7 @@ export default function SyncOrdersScreen() {
       // 2) Força download completo de cada tabela crítica para garantir cache offline
       for (const table of syncTables) {
         try {
-          await downloadTable(table, true);
+          await downloadTable(table, true, 180000);
           downloadedTables.push(table);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'erro desconhecido';

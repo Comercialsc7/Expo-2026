@@ -88,7 +88,7 @@ export function useSyncService(): UseSyncServiceResult {
     }
   }, []);
 
-  const download = useCallback(async (tables: string[], downloadTimeoutMs = 60000) => {
+  const download = useCallback(async (tables: string[], downloadTimeoutMs = 180000) => {
     try {
       setError(null);
       const config: SyncConfig = { tables, downloadTimeoutMs };
@@ -114,7 +114,7 @@ export function useSyncService(): UseSyncServiceResult {
     }
   }, []);
 
-  const downloadTable = useCallback(async (table: string, fullRefresh = false, timeoutMs = 60000) => {
+  const downloadTable = useCallback(async (table: string, fullRefresh = false, timeoutMs = 180000) => {
     try {
       setError(null);
       setSyncing(true);

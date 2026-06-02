@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Image, FlatList, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { usePaymentTermsStore } from '../../../store/usePaymentTermsStore';
 import { useProducts, UniqueProductOption } from '../../../hooks/useProducts';
@@ -108,51 +108,63 @@ export default function ProductSearch() {
         </View>
       )}
 
-      <ScrollView style={styles.content}>
-        {selectedSupplier === null ? (
-          filteredSuppliers.map((supplier) => (
-            <TouchableOpacity
-              key={`${supplier.codFor}-${supplier.fornecedor}`}
-              style={styles.productCard}
-              onPress={() => {
-                setSelectedSupplier(supplier.codFor);
-                setSearchQuery('');
-              }}
-            >
-              <View style={styles.productInfo}>
-                <Text style={styles.productName}>{supplier.label}</Text>
-                <Text style={styles.productCode}>Fornecedor</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          filteredProducts.map((product) => {
-            const isAccelerator =
-              product.is_acelerator === true ||
-              Number(product.is_acelerator) === 1;
-
+      <FlatList
+        data={selectedSupplier === null ? filteredSuppliers : filteredProducts}
+        keyExtractor={(item) =>
+          selectedSupplier === null
+            ? `${(item as unknown as { codFor: number; fornecedor: string }).codFor}-${(item as unknown as { codFor: number; fornecedor: string }).fornecedor}`
+            : `${selectedSupplier}-${(item as UniqueProductOption).code}`
+        }
+        renderItem={({ item }) => {
+          if (selectedSupplier === null) {
+            const supplier = item as unknown as { codFor: number; label: string };
             return (
               <TouchableOpacity
-                key={`${selectedSupplier}-${product.code}`}
                 style={styles.productCard}
-                onPress={() => handleSelectProduct(product)}
+                onPress={() => {
+                  setSelectedSupplier(Number(supplier.codFor));
+                  setSearchQuery('');
+                }}
               >
                 <View style={styles.productInfo}>
-                  <View style={styles.productHeaderNew}>
-                    <Text style={styles.productCode}>{product.code}</Text>
-                    {isAccelerator ? (
-                      <Image source={Diamond} style={styles.productAcceleratorIcon} />
-                    ) : (
-                      <Text style={{ width: 30 }}></Text>
-                    )}
-                  </View>
-                  <Text style={styles.productName}>{product.name}</Text>
+                  <Text style={styles.productName}>{supplier.label}</Text>
+                  <Text style={styles.productCode}>Fornecedor</Text>
                 </View>
               </TouchableOpacity>
             );
-          })
-        )}
-      </ScrollView>
+          }
+
+          const product = item as UniqueProductOption;
+          const isAccelerator =
+            product.is_acelerator === true ||
+            Number(product.is_acelerator) === 1;
+
+          return (
+            <TouchableOpacity
+              style={styles.productCard}
+              onPress={() => handleSelectProduct(product)}
+            >
+              <View style={styles.productInfo}>
+                <View style={styles.productHeaderNew}>
+                  <Text style={styles.productCode}>{product.code}</Text>
+                  {isAccelerator ? (
+                    <Image source={Diamond} style={styles.productAcceleratorIcon} />
+                  ) : (
+                    <Text style={{ width: 30 }}></Text>
+                  )}
+                </View>
+                <Text style={styles.productName}>{product.name}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        contentContainerStyle={styles.content}
+        initialNumToRender={16}
+        maxToRenderPerBatch={16}
+        updateCellsBatchingPeriod={60}
+        windowSize={8}
+        removeClippedSubviews
+      />
     </View>
   );
 }

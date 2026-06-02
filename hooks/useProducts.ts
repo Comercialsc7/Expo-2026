@@ -36,6 +36,7 @@ export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const PRODUCTS_SELECT_COLUMNS = 'id, name, code, price, emb, qtde, is_acelerator, image_url, fornecedor, cod_for, created_at';
 
   const suppliers = useMemo(() => {
     const supplierMap = new Map<string, SupplierOption>();
@@ -132,14 +133,14 @@ export const useProducts = () => {
 
       // Buscar TODOS os produtos em lotes para evitar timeouts
       let allProducts: Product[] = [];
-      const batchSize = 1000;
+      const batchSize = 500;
       let offset = 0;
       let hasMore = true;
 
       // Verificar quantos produtos existem no total
       const { count, error: countError } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true });
+        .select(PRODUCTS_SELECT_COLUMNS, { count: 'exact', head: true });
       if (countError) {
         console.warn('Erro ao contar produtos:', countError);
       }
@@ -149,7 +150,7 @@ export const useProducts = () => {
         debugLog(`🔄 Buscando lote ${Math.floor(offset / batchSize) + 1} (produtos ${offset + 1} a ${offset + batchSize})...`);
         const { data, error } = await supabase
           .from('products')
-          .select('*')
+          .select(PRODUCTS_SELECT_COLUMNS)
           .order('name', { ascending: true })
           .range(offset, offset + batchSize - 1);
         if (error) {
@@ -157,7 +158,7 @@ export const useProducts = () => {
           throw error;
         }
         if (data && data.length > 0) {
-          allProducts = [...allProducts, ...data];
+          allProducts.push(...(data as Product[]));
           debugLog(`✅ Lote carregado: ${data.length} produtos (Total acumulado: ${allProducts.length})`);
           if (data.length < batchSize) {
             hasMore = false;

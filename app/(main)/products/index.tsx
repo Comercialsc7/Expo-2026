@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useProducts, SupplierOption, UniqueProductOption } from '../../../hooks/useProducts';
+import { getOptimizedRemoteImageUrl } from '../../../lib/imageUtils';
 
 export default function ProductsScreen() {
   const { suppliers, getUniqueProductsBySupplier, loading } = useProducts();
@@ -56,7 +57,12 @@ export default function ProductsScreen() {
       onPress={() => handleSelectProduct(item)}
     >
       {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={styles.productImage} />
+        <Image
+          source={{ uri: getOptimizedRemoteImageUrl(item.image_url, { width: 180, quality: 40 }), cache: 'force-cache' }}
+          style={styles.productImage}
+          progressiveRenderingEnabled
+          fadeDuration={0}
+        />
       ) : (
         <View style={styles.productImagePlaceholder}>
           <View style={{ width: 24, height: 24, backgroundColor: '#003B71' }} />
@@ -128,7 +134,12 @@ export default function ProductsScreen() {
           data={selectedSupplier ? filteredProducts : filteredSuppliers}
           renderItem={selectedSupplier ? renderProductItem : renderSupplierItem}
           keyExtractor={(item) => selectedSupplier ? `${selectedSupplier.codFor}-${(item as UniqueProductOption).code}` : `${(item as SupplierOption).codFor}-${(item as SupplierOption).fornecedor}`}
-        contentContainerStyle={styles.productList}
+          contentContainerStyle={styles.productList}
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          updateCellsBatchingPeriod={60}
+          windowSize={8}
+          removeClippedSubviews
       />
       )}
     </View>

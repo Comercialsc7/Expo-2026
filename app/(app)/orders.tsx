@@ -18,10 +18,11 @@ import { useProducts } from '../../hooks/useProducts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../lib/TableStore';
 import OfflineSQLiteService from '../../lib/OfflineSQLiteService';
+import { getOptimizedRemoteImageUrl } from '../../lib/imageUtils';
 
 const Diamond = require('../../assets/images/diamond.png');
-const ACCELERATOR_IMAGE_PREFETCH_LIMIT = 60;
-const ACCELERATOR_IMAGE_PREFETCH_BATCH = 6;
+const ACCELERATOR_IMAGE_PREFETCH_LIMIT = 30;
+const ACCELERATOR_IMAGE_PREFETCH_BATCH = 3;
 
 interface Brand {
   id: string;
@@ -573,7 +574,7 @@ export default function OrdersScreen() {
     const uniqueUrls = Array.from(
       new Set(
         acceleratorProducts
-          .map((product) => String(product.image_url || '').trim())
+          .map((product) => getOptimizedRemoteImageUrl(product.image_url, { width: 220, quality: 40 }))
           .filter((url) => url.length > 0)
       )
     );
@@ -678,8 +679,9 @@ export default function OrdersScreen() {
                 <View style={styles.brandImageContainer}>
                   {brand.image_url ? (
                     <Image
-                      source={{ uri: brand.image_url }}
+                      source={{ uri: getOptimizedRemoteImageUrl(brand.image_url, { width: 120, quality: 40 }) }}
                       style={styles.brandImage}
+                      fadeDuration={0}
                     />
                   ) : (
                     <View style={styles.brandImagePlaceholder}>
@@ -723,9 +725,10 @@ export default function OrdersScreen() {
                   />
                   {product.image_url ? (
                     <Image
-                      source={{ uri: product.image_url, cache: 'force-cache' }}
+                      source={{ uri: getOptimizedRemoteImageUrl(product.image_url, { width: 220, quality: 40 }), cache: 'force-cache' }}
                       style={styles.productImage}
                       progressiveRenderingEnabled={Platform.OS === 'android'}
+                      fadeDuration={0}
                     />
                   ) : (
                     <View style={styles.productImagePlaceholder}>
