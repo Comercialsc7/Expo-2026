@@ -1,23 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useOrderStore, PaymentTerm } from '../../../store/useOrderStore';
+
+const CASH_ONLY_PAYMENT_TERM: PaymentTerm = {
+  id: 'cash-only',
+  description: 'À Vista',
+  prazo_dias: 0,
+};
 
 export default function PaymentMethodScreen() {
   const { client, setPaymentTerm: setOrderPaymentTerm } = useOrderStore();
   const [selectedTerm, setSelectedTerm] = useState<PaymentTerm | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const availablePaymentTerms = useMemo(() => {
+    const paymentTerms = (client?.payment_terms as unknown as PaymentTerm[]) || [];
+    return paymentTerms.length > 0 ? paymentTerms : [CASH_ONLY_PAYMENT_TERM];
+  }, [client?.payment_terms]);
+
   useEffect(() => {
-    if (client?.payment_terms && client.payment_terms.length > 0) {
-      const paymentTerms = client.payment_terms as unknown as PaymentTerm[];
-      setSelectedTerm(paymentTerms[0]);
-      setOrderPaymentTerm(paymentTerms[0]);
+    if (availablePaymentTerms.length > 0) {
+      setSelectedTerm(availablePaymentTerms[0]);
+      setOrderPaymentTerm(availablePaymentTerms[0]);
       setLoading(false);
     } else {
       setLoading(false);
     }
-  }, [client?.payment_terms, setOrderPaymentTerm]);
+  }, [availablePaymentTerms, setOrderPaymentTerm]);
 
   const handleSelectTerm = (term: PaymentTerm) => {
     setSelectedTerm(term);
@@ -57,10 +67,8 @@ export default function PaymentMethodScreen() {
           <Text style={styles.sectionTitle}>Selecione a condição de pagamento</Text>
           {loading ? (
             <Text style={styles.loadingText}>Carregando prazos...</Text>
-          ) : !client?.payment_terms || client.payment_terms.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhuma condição de pagamento disponível para este cliente.</Text>
           ) : (
-            (client.payment_terms as unknown as PaymentTerm[]).map(term => (
+            availablePaymentTerms.map(term => (
               <TouchableOpacity
                 key={term.id}
                 style={[

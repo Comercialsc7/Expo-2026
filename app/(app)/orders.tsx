@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Platform, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { MovingBorderButton } from '../../components/ui/moving-border';
@@ -29,6 +29,47 @@ interface Brand {
   name: string;
   image_url: string | null;
   created_at?: string;
+}
+
+interface SafeOptimizedImageProps {
+  uri: string;
+  style: any;
+  width: number;
+  quality: number;
+  progressive?: boolean;
+}
+
+function SafeOptimizedImage({ uri, style, width, quality, progressive = false }: SafeOptimizedImageProps) {
+  const originalUri = useMemo(() => String(uri || '').trim(), [uri]);
+  const optimizedUri = useMemo(
+    () => getOptimizedRemoteImageUrl(originalUri, { width, quality }),
+    [originalUri, width, quality]
+  );
+  const [resolvedUri, setResolvedUri] = useState(optimizedUri || originalUri);
+
+  useEffect(() => {
+    setResolvedUri(optimizedUri || originalUri);
+  }, [optimizedUri, originalUri]);
+
+  const handleError = useCallback(() => {
+    if (resolvedUri !== originalUri) {
+      setResolvedUri(originalUri);
+    }
+  }, [originalUri, resolvedUri]);
+
+  if (!resolvedUri) {
+    return null;
+  }
+
+  return (
+    <Image
+      source={{ uri: resolvedUri, cache: 'force-cache' }}
+      style={style}
+      progressiveRenderingEnabled={progressive && Platform.OS === 'android'}
+      fadeDuration={0}
+      onError={handleError}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
@@ -678,10 +719,11 @@ export default function OrdersScreen() {
               >
                 <View style={styles.brandImageContainer}>
                   {brand.image_url ? (
-                    <Image
-                      source={{ uri: getOptimizedRemoteImageUrl(brand.image_url, { width: 120, quality: 40 }) }}
+                    <SafeOptimizedImage
+                      uri={brand.image_url}
                       style={styles.brandImage}
-                      fadeDuration={0}
+                      width={120}
+                      quality={40}
                     />
                   ) : (
                     <View style={styles.brandImagePlaceholder}>
@@ -724,11 +766,12 @@ export default function OrdersScreen() {
                     style={styles.productDiamondBadge}
                   />
                   {product.image_url ? (
-                    <Image
-                      source={{ uri: getOptimizedRemoteImageUrl(product.image_url, { width: 220, quality: 40 }), cache: 'force-cache' }}
+                    <SafeOptimizedImage
+                      uri={product.image_url}
                       style={styles.productImage}
-                      progressiveRenderingEnabled={Platform.OS === 'android'}
-                      fadeDuration={0}
+                      width={220}
+                      quality={40}
+                      progressive
                     />
                   ) : (
                     <View style={styles.productImagePlaceholder}>

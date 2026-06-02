@@ -1,8 +1,48 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useProducts, SupplierOption, UniqueProductOption } from '../../../hooks/useProducts';
 import { getOptimizedRemoteImageUrl } from '../../../lib/imageUtils';
+
+interface SafeOptimizedImageProps {
+  uri: string;
+  style: any;
+  width: number;
+  quality: number;
+}
+
+function SafeOptimizedImage({ uri, style, width, quality }: SafeOptimizedImageProps) {
+  const originalUri = useMemo(() => String(uri || '').trim(), [uri]);
+  const optimizedUri = useMemo(
+    () => getOptimizedRemoteImageUrl(originalUri, { width, quality }),
+    [originalUri, width, quality]
+  );
+  const [resolvedUri, setResolvedUri] = useState(optimizedUri || originalUri);
+
+  useEffect(() => {
+    setResolvedUri(optimizedUri || originalUri);
+  }, [optimizedUri, originalUri]);
+
+  const handleError = useCallback(() => {
+    if (resolvedUri !== originalUri) {
+      setResolvedUri(originalUri);
+    }
+  }, [originalUri, resolvedUri]);
+
+  if (!resolvedUri) {
+    return null;
+  }
+
+  return (
+    <Image
+      source={{ uri: resolvedUri, cache: 'force-cache' }}
+      style={style}
+      progressiveRenderingEnabled
+      fadeDuration={0}
+      onError={handleError}
+    />
+  );
+}
 
 export default function ProductsScreen() {
   const { suppliers, getUniqueProductsBySupplier, loading } = useProducts();
@@ -57,11 +97,11 @@ export default function ProductsScreen() {
       onPress={() => handleSelectProduct(item)}
     >
       {item.image_url ? (
-        <Image
-          source={{ uri: getOptimizedRemoteImageUrl(item.image_url, { width: 180, quality: 40 }), cache: 'force-cache' }}
+        <SafeOptimizedImage
+          uri={item.image_url}
           style={styles.productImage}
-          progressiveRenderingEnabled
-          fadeDuration={0}
+          width={180}
+          quality={40}
         />
       ) : (
         <View style={styles.productImagePlaceholder}>

@@ -8,6 +8,12 @@ import TableStore from '../../../lib/TableStore';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
 import SQLiteStore from '../../../lib/SQLiteStore';
 
+const CASH_ONLY_PAYMENT_TERM: PaymentTerm = {
+  id: 'cash-only',
+  description: 'À Vista',
+  prazo_dias: 0,
+};
+
 const mergeByKey = (
   existing: any[],
   incoming: any[],
@@ -115,7 +121,7 @@ export default function SelectClient() {
         : null;
 
       if (diamax === undefined || diamax === null) {
-        return [];
+        return [CASH_ONLY_PAYMENT_TERM];
       }
 
       const { data: prazos, error: errorPrazos } = await supabase
@@ -137,11 +143,13 @@ export default function SelectClient() {
         }
       }
 
-      return (prazos || []).map((prazo: any) => ({
+      const mappedTerms = (prazos || []).map((prazo: any) => ({
         id: prazo.id,
         description: prazo.prazo,
         prazo_dias: prazo.dias,
       }));
+
+      return mappedTerms.length > 0 ? mappedTerms : [CASH_ONLY_PAYMENT_TERM];
     } catch (error) {
       console.warn('⚠️ Falha ao buscar prazos online. Usando cache local...', error);
 
@@ -157,16 +165,18 @@ export default function SelectClient() {
         : null;
 
       if (diamax === undefined || diamax === null) {
-        return [];
+        return [CASH_ONLY_PAYMENT_TERM];
       }
 
-      return prazosFallback
+      const mappedTerms = prazosFallback
         .filter((prazo: any) => Number(prazo.dias) <= diamax)
         .map((prazo: any) => ({
           id: prazo.id,
           description: prazo.prazo,
           prazo_dias: prazo.dias,
         }));
+
+      return mappedTerms.length > 0 ? mappedTerms : [CASH_ONLY_PAYMENT_TERM];
     }
   }, [readTableWithFallbacks]);
 
@@ -278,10 +288,11 @@ export default function SelectClient() {
 
   const handleSelectClient = useCallback(async (client: Client) => {
     try {
-      const payment_terms = await getPaymentTermsWithFallback(client.code);
+      const paymentTerms = await getPaymentTermsWithFallback(client.code);
+      const safePaymentTerms = paymentTerms.length > 0 ? paymentTerms : [CASH_ONLY_PAYMENT_TERM];
 
       // Passar o cliente com os prazos permitidos para o store
-      setClient({ ...client, payment_terms: payment_terms as any });
+      setClient({ ...client, payment_terms: safePaymentTerms as any });
       router.push('/create-order/payment-method');
     } catch (error) {
       console.error('Erro ao buscar condições de pagamento do cliente:', error);
