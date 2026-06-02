@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Platform, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { MovingBorderButton } from '../../components/ui/moving-border';
 import Animated, {
@@ -193,7 +193,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
+    rowGap: 12,
   },
   productItem: {
     marginRight: 16,
@@ -219,10 +220,10 @@ const styles = StyleSheet.create({
   },
   productItemGrid: {
     position: 'relative',
-    marginBottom: 8,
+    width: '31.8%',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 8,
+    padding: 10,
     alignItems: 'center',
     ...Platform.select({
       ios: {
@@ -393,15 +394,7 @@ export default function OrdersScreen() {
   const [currentBanner, setCurrentBanner] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const fadeAnim = useSharedValue(1);
-  const { width: screenWidth } = useWindowDimensions();
-  const gridHorizontalPadding = 32;
-  const gridColumnGap = 12;
-  const gridRowGap = 12;
-  const productCardWidth = Math.max(
-    86,
-    Math.floor((screenWidth - gridHorizontalPadding - gridColumnGap * 2) / 3)
-  );
-  const productImageHeight = Math.max(60, Math.min(90, productCardWidth - 16));
+  const screenWidth = Dimensions.get('window').width;
   const { navigateTo } = useNavigation();
   const { products, loading: productsLoading, error: productsError } = useProducts();
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -672,17 +665,10 @@ export default function OrdersScreen() {
             <Text style={styles.sectionStateText}>Nenhum item acelerador disponível.</Text>
           ) : (
             <View style={styles.productsGrid}>
-              {acceleratorProducts.map((product, index) => (
+              {acceleratorProducts.map((product) => (
                 <TouchableOpacity
                   key={product.id}
-                  style={[
-                    styles.productItemGrid,
-                    {
-                      width: productCardWidth,
-                      marginRight: (index + 1) % 3 === 0 ? 0 : gridColumnGap,
-                      marginBottom: gridRowGap,
-                    },
-                  ]}
+                  style={styles.productItemGrid}
                   onPress={() => navigateTo('/create-order' as any)}
                 >
                   <Image
@@ -692,10 +678,10 @@ export default function OrdersScreen() {
                   {product.image_url ? (
                     <Image
                       source={{ uri: product.image_url }}
-                      style={[styles.productImage, { height: productImageHeight }]}
+                      style={styles.productImage}
                     />
                   ) : (
-                    <View style={[styles.productImagePlaceholder, { height: productImageHeight }]}>
+                    <View style={styles.productImagePlaceholder}>
                       <Text style={styles.productImagePlaceholderText}>Sem imagem</Text>
                     </View>
                   )}
