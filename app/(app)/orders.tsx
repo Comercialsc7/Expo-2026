@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Platform, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { MovingBorderButton } from '../../components/ui/moving-border';
@@ -20,6 +20,8 @@ import TableStore from '../../lib/TableStore';
 import OfflineSQLiteService from '../../lib/OfflineSQLiteService';
 
 const Diamond = require('../../assets/images/diamond.png');
+const ACCELERATOR_IMAGE_PREFETCH_LIMIT = 60;
+const ACCELERATOR_IMAGE_PREFETCH_BATCH = 6;
 
 interface Brand {
   id: string;
@@ -399,6 +401,7 @@ export default function OrdersScreen() {
   const { products, loading: productsLoading, error: productsError } = useProducts();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [representanteNome, setRepresentanteNome] = useState<string | null>(null);
+  const prefetchedAcceleratorUrlsRef = useRef<Set<string>>(new Set());
 
   const menuItems: MenuItem[] = [
     {
@@ -564,6 +567,49 @@ export default function OrdersScreen() {
     );
   }, [products]);
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    const uniqueUrls = Array.from(
+      new Set(
+        acceleratorProducts
+          .map((product) => String(product.image_url || '').trim())
+          .filter((url) => url.length > 0)
+      )
+    );
+
+    const pendingUrls = uniqueUrls
+      .filter((url) => !prefetchedAcceleratorUrlsRef.current.has(url))
+      .slice(0, ACCELERATOR_IMAGE_PREFETCH_LIMIT);
+
+    const prefetchInBatches = async () => {
+      for (let i = 0; i < pendingUrls.length; i += ACCELERATOR_IMAGE_PREFETCH_BATCH) {
+        if (isCancelled) {
+          return;
+        }
+
+        const batch = pendingUrls.slice(i, i + ACCELERATOR_IMAGE_PREFETCH_BATCH);
+        const settled = await Promise.allSettled(batch.map((url) => Image.prefetch(url)));
+
+        settled.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value) {
+            prefetchedAcceleratorUrlsRef.current.add(batch[index]);
+          }
+        });
+      }
+    };
+
+    if (pendingUrls.length > 0) {
+      prefetchInBatches().catch((error) => {
+        console.warn('Falha no prefetch de imagens dos aceleradores:', error);
+      });
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [acceleratorProducts]);
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -677,8 +723,9 @@ export default function OrdersScreen() {
                   />
                   {product.image_url ? (
                     <Image
-                      source={{ uri: product.image_url }}
+                      source={{ uri: product.image_url, cache: 'force-cache' }}
                       style={styles.productImage}
+                      progressiveRenderingEnabled={Platform.OS === 'android'}
                     />
                   ) : (
                     <View style={styles.productImagePlaceholder}>
