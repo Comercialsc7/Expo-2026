@@ -162,7 +162,7 @@ export default function OrderSummaryScreen() {
 
           {cuponsGanhos > 0 && (
             <View style={styles.couponBox}>
-              <Text style={styles.couponText}>Você Ganhou {cuponsGanhos} CUPOM(s)</Text>
+              <Text style={styles.couponText}>Você Ganhou {cuponsGanhos} Nº da Sorte(s)</Text>
             </View>
           )}
         </View>
@@ -177,7 +177,7 @@ export default function OrderSummaryScreen() {
             <View style={styles.motoLabelBox}>
               <Text style={styles.motoLabelText}>
                 Faltam <Text style={styles.motoLabelValue}>R$ {faltaParaMoto.toFixed(2)}</Text>{' '}
-                {cuponsGanhos > 0 ? 'para o próximo cupom para concorrer a uma moto 0km' : 'para você concorrer a uma moto 0km'}
+                {cuponsGanhos > 0 ? 'para o próximo número da sorte para concorrer a uma moto 0km' : 'para você concorrer a uma moto 0km'}
               </Text>
             </View>
           )}
