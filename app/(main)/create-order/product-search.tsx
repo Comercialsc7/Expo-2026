@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Image, FlatList, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { usePaymentTermsStore } from '../../../store/usePaymentTermsStore';
@@ -17,23 +17,31 @@ interface Product {
 */
 
 export default function ProductSearch() {
+  type SearchableProduct = UniqueProductOption & { codFor: number; fornecedor: string };
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
   const { paymentTermId } = useLocalSearchParams();
   const paymentTerms = usePaymentTermsStore(state => state.paymentTerms);
   const selectedPaymentTerm = paymentTerms.find(term => term.id === paymentTermId);
   const { suppliers, getUniqueProductsBySupplier, loading, error } = useProducts();
 
-  const filteredSuppliers = suppliers.filter((supplier) =>
-    supplier.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredProducts = selectedSupplier === null
-    ? []
-    : getUniqueProductsBySupplier(selectedSupplier).filter((product: UniqueProductOption) =>
-      (product.name && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (product.code && product.code.toLowerCase().includes(searchQuery.toLowerCase()))
+  const searchableProducts = useMemo<SearchableProduct[]>(() => {
+    return suppliers.flatMap((supplier) =>
+      getUniqueProductsBySupplier(supplier.codFor).map((product) => ({
+        ...product,
+        codFor: supplier.codFor,
+        fornecedor: supplier.fornecedor,
+      }))
     );
+  }, [suppliers, getUniqueProductsBySupplier]);
+
+  const filteredProducts = searchableProducts.filter((product) => {
+    const term = searchQuery.toLowerCase();
+    return (
+      String(product.name || '').toLowerCase().includes(term) ||
+      String(product.code || '').toLowerCase().includes(term)
+    );
+  });
 
   if (loading) {
     return (
@@ -51,11 +59,11 @@ export default function ProductSearch() {
     );
   }
 
-  const handleSelectProduct = (product: UniqueProductOption) => {
+  const handleSelectProduct = (product: SearchableProduct) => {
     router.push({
       pathname: '/(main)/create-order/product-detail',
       params: {
-        cod_for: String(selectedSupplier),
+        cod_for: String(product.codFor),
         name: product.name,
         code: product.code,
         image_url: product.image_url,
@@ -87,54 +95,18 @@ export default function ProductSearch() {
           <Image source={require('../../../assets/images/buscar.png')} style={styles.searchInnerIconImage} />
           <TextInput
             style={styles.searchInput}
-            placeholder={selectedSupplier === null ? 'Buscar fornecedor...' : 'Buscar produto...'}
+            placeholder="Buscar produto ou codigo..."
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
       </View>
 
-      {selectedSupplier !== null && (
-        <View style={styles.breadcrumbContainer}>
-          <TouchableOpacity
-            style={styles.breadcrumbButton}
-            onPress={() => {
-              setSelectedSupplier(null);
-              setSearchQuery('');
-            }}
-          >
-            <Text style={styles.breadcrumbButtonText}>Trocar fornecedor</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <FlatList
-        data={selectedSupplier === null ? filteredSuppliers : filteredProducts}
-        keyExtractor={(item) =>
-          selectedSupplier === null
-            ? `${(item as unknown as { codFor: number; fornecedor: string }).codFor}-${(item as unknown as { codFor: number; fornecedor: string }).fornecedor}`
-            : `${selectedSupplier}-${(item as UniqueProductOption).code}`
-        }
+      <FlatList<SearchableProduct>
+        data={filteredProducts}
+        keyExtractor={(item) => `${item.codFor}-${item.code}`}
         renderItem={({ item }) => {
-          if (selectedSupplier === null) {
-            const supplier = item as unknown as { codFor: number; label: string };
-            return (
-              <TouchableOpacity
-                style={styles.productCard}
-                onPress={() => {
-                  setSelectedSupplier(Number(supplier.codFor));
-                  setSearchQuery('');
-                }}
-              >
-                <View style={styles.productInfo}>
-                  <Text style={styles.productName}>{supplier.label}</Text>
-                  <Text style={styles.productCode}>Fornecedor</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          }
-
-          const product = item as UniqueProductOption;
+          const product = item;
           const isAccelerator =
             product.is_acelerator === true ||
             Number(product.is_acelerator) === 1;
@@ -154,6 +126,7 @@ export default function ProductSearch() {
                   )}
                 </View>
                 <Text style={styles.productName}>{product.name}</Text>
+                <Text style={styles.productCode}>{product.fornecedor}</Text>
               </View>
             </TouchableOpacity>
           );
