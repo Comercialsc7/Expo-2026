@@ -6,7 +6,7 @@ import { useNavigation } from '../../../hooks/useNavigation';
 import { useOrderStore, OrderItem } from '../../../store/useOrderStore';
 import { useCachedOrdersStore } from '../../../store/useCachedOrdersStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { calculateSpins } from '../../../lib/spinRewards';
+import { calculateSpins, MAX_SPINS } from '../../../lib/spinRewards';
 import { generateShortOrderNumber } from '../../../lib/orderNumber';
 import type { SpinPrizeEntry } from '../../../store/useCachedOrdersStore';
 
@@ -29,6 +29,7 @@ export default function OrderSummaryScreen() {
   const girosGanhos = calculateSpins(total);
   const girosRestantes = girosGanhos - results.length;
   const faltaGiro = 3000 - (total % 3000) || 0;
+  const atingiuLimiteDeGiros = girosGanhos >= MAX_SPINS;
   const cuponsGanhos = Math.floor(total / 5000);
   const faltaParaMoto = (total % 5000 === 0 && total !== 0) ? 5000 : (5000 - (total % 5000));
 
@@ -166,7 +167,7 @@ export default function OrderSummaryScreen() {
           )}
         </View>
         <View style={styles.bottomSection}>
-          {faltaGiro > 0 && (
+          {!atingiuLimiteDeGiros && faltaGiro > 0 && (
             <View style={styles.giroLabelBox}>
               <Text style={styles.giroLabelText}>Faltam <Text style={styles.giroLabelValue}>R$ {faltaGiro.toFixed(2)}</Text> para o próximo giro da sorte</Text>
             </View>
