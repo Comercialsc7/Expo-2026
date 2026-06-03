@@ -24,6 +24,7 @@ export default function ProductSearch() {
   };
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedSections, setExpandedSections] = useState<Record<number, boolean>>({});
   const { paymentTermId } = useLocalSearchParams();
   const paymentTerms = usePaymentTermsStore(state => state.paymentTerms);
   const selectedPaymentTerm = paymentTerms.find(term => term.id === paymentTermId);
@@ -54,6 +55,13 @@ export default function ProductSearch() {
       .filter((section) => section.data.length > 0);
   }, [suppliers, getUniqueProductsBySupplier, searchQuery]);
 
+  const displayedSections = useMemo<ProductSection[]>(() => {
+    return filteredSections.map((section) => ({
+      ...section,
+      data: expandedSections[section.codFor] ? section.data : [],
+    }));
+  }, [expandedSections, filteredSections]);
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -81,6 +89,13 @@ export default function ProductSearch() {
         paymentTermId: paymentTermId ? String(paymentTermId) : '',
       }
     });
+  };
+
+  const toggleSection = (codFor: number) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [codFor]: !prev[codFor],
+    }));
   };
 
   return (
@@ -114,13 +129,21 @@ export default function ProductSearch() {
       </View>
 
       <SectionList<UniqueProductOption, ProductSection>
-        sections={filteredSections}
+        sections={displayedSections}
         keyExtractor={(item, index) => `${item.code}-${index}`}
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{section.title}</Text>
-          </View>
-        )}
+        renderSectionHeader={({ section }) => {
+          const isExpanded = !!expandedSections[section.codFor];
+          return (
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection(section.codFor)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.sectionHeaderText}>{section.title}</Text>
+              <Text style={styles.sectionChevron}>{isExpanded ? '▼' : '▶'}</Text>
+            </TouchableOpacity>
+          );
+        }}
         renderItem={({ item, section }) => {
           const product = item;
           const isAccelerator =
@@ -237,11 +260,19 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 6,
   },
   sectionHeaderText: {
     fontSize: 13,
+    color: '#003B71',
+    fontFamily: 'Montserrat-SemiBold',
+  },
+  sectionChevron: {
+    fontSize: 12,
     color: '#003B71',
     fontFamily: 'Montserrat-SemiBold',
   },
