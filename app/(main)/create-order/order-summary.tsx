@@ -6,7 +6,7 @@ import { useNavigation } from '../../../hooks/useNavigation';
 import { useOrderStore, OrderItem } from '../../../store/useOrderStore';
 import { useCachedOrdersStore } from '../../../store/useCachedOrdersStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { calculateSpins, MAX_SPINS } from '../../../lib/spinRewards';
+import { calculateSpins, MAX_SPINS, SPIN_THRESHOLD } from '../../../lib/spinRewards';
 import { generateShortOrderNumber } from '../../../lib/orderNumber';
 import type { SpinPrizeEntry } from '../../../store/useCachedOrdersStore';
 
@@ -28,8 +28,8 @@ export default function OrderSummaryScreen() {
 
   const girosGanhos = calculateSpins(total);
   const girosRestantes = girosGanhos - results.length;
-  const faltaGiro = 3000 - (total % 3000) || 0;
-  const atingiuLimiteDeGiros = girosGanhos >= MAX_SPINS;
+  const faltaGiro = SPIN_THRESHOLD - (total % SPIN_THRESHOLD) || 0;
+  const atingiuLimiteDeGiros = total >= MAX_SPINS * SPIN_THRESHOLD;
   const cuponsGanhos = Math.floor(total / 5000);
   const faltaParaMoto = (total % 5000 === 0 && total !== 0) ? 5000 : (5000 - (total % 5000));
 
@@ -175,7 +175,10 @@ export default function OrderSummaryScreen() {
 
           {faltaParaMoto > 0 && (
             <View style={styles.motoLabelBox}>
-              <Text style={styles.motoLabelText}>Faltam <Text style={styles.motoLabelValue}>R$ {faltaParaMoto.toFixed(2)}</Text> para você concorrer a uma moto 0km</Text>
+              <Text style={styles.motoLabelText}>
+                Faltam <Text style={styles.motoLabelValue}>R$ {faltaParaMoto.toFixed(2)}</Text>{' '}
+                {cuponsGanhos > 0 ? 'para o próximo cupom para concorrer a uma moto 0km' : 'para você concorrer a uma moto 0km'}
+              </Text>
             </View>
           )}
         </View>
