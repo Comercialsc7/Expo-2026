@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Image, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Image, SectionList, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { usePaymentTermsStore } from '../../../store/usePaymentTermsStore';
 import { useProducts, UniqueProductOption } from '../../../hooks/useProducts';
@@ -17,7 +17,11 @@ interface Product {
 */
 
 export default function ProductSearch() {
-  type SearchableProduct = UniqueProductOption & { codFor: number; fornecedor: string };
+  type ProductSection = {
+    title: string;
+    codFor: number;
+    data: UniqueProductOption[];
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const { paymentTermId } = useLocalSearchParams();
@@ -25,23 +29,30 @@ export default function ProductSearch() {
   const selectedPaymentTerm = paymentTerms.find(term => term.id === paymentTermId);
   const { suppliers, getUniqueProductsBySupplier, loading, error } = useProducts();
 
-  const searchableProducts = useMemo<SearchableProduct[]>(() => {
-    return suppliers.flatMap((supplier) =>
-      getUniqueProductsBySupplier(supplier.codFor).map((product) => ({
-        ...product,
-        codFor: supplier.codFor,
-        fornecedor: supplier.fornecedor,
-      }))
-    );
-  }, [suppliers, getUniqueProductsBySupplier]);
+  const filteredSections = useMemo<ProductSection[]>(() => {
+    const term = searchQuery.trim().toLowerCase();
 
-  const filteredProducts = searchableProducts.filter((product) => {
-    const term = searchQuery.toLowerCase();
-    return (
-      String(product.name || '').toLowerCase().includes(term) ||
-      String(product.code || '').toLowerCase().includes(term)
-    );
-  });
+    return suppliers
+      .map((supplier) => {
+        const products = getUniqueProductsBySupplier(supplier.codFor).filter((product) => {
+          if (!term) {
+            return true;
+          }
+
+          return (
+            String(product.name || '').toLowerCase().includes(term) ||
+            String(product.code || '').toLowerCase().includes(term)
+          );
+        });
+
+        return {
+          title: supplier.label,
+          codFor: supplier.codFor,
+          data: products,
+        };
+      })
+      .filter((section) => section.data.length > 0);
+  }, [suppliers, getUniqueProductsBySupplier, searchQuery]);
 
   if (loading) {
     return (
@@ -59,11 +70,11 @@ export default function ProductSearch() {
     );
   }
 
-  const handleSelectProduct = (product: SearchableProduct) => {
+  const handleSelectProduct = (product: UniqueProductOption, codFor: number) => {
     router.push({
       pathname: '/(main)/create-order/product-detail',
       params: {
-        cod_for: String(product.codFor),
+        cod_for: String(codFor),
         name: product.name,
         code: product.code,
         image_url: product.image_url,
@@ -102,10 +113,15 @@ export default function ProductSearch() {
         </View>
       </View>
 
-      <FlatList<SearchableProduct>
-        data={filteredProducts}
-        keyExtractor={(item) => `${item.codFor}-${item.code}`}
-        renderItem={({ item }) => {
+      <SectionList<UniqueProductOption, ProductSection>
+        sections={filteredSections}
+        keyExtractor={(item, index) => `${item.code}-${index}`}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{section.title}</Text>
+          </View>
+        )}
+        renderItem={({ item, section }) => {
           const product = item;
           const isAccelerator =
             product.is_acelerator === true ||
@@ -114,7 +130,7 @@ export default function ProductSearch() {
           return (
             <TouchableOpacity
               style={styles.productCard}
-              onPress={() => handleSelectProduct(product)}
+              onPress={() => handleSelectProduct(product, section.codFor)}
             >
               <View style={styles.productInfo}>
                 <View style={styles.productHeaderNew}>
@@ -126,7 +142,6 @@ export default function ProductSearch() {
                   )}
                 </View>
                 <Text style={styles.productName}>{product.name}</Text>
-                <Text style={styles.productCode}>{product.fornecedor}</Text>
               </View>
             </TouchableOpacity>
           );
@@ -137,6 +152,7 @@ export default function ProductSearch() {
         updateCellsBatchingPeriod={60}
         windowSize={8}
         removeClippedSubviews
+        stickySectionHeadersEnabled={false}
       />
     </View>
   );
@@ -219,6 +235,15 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+  },
+  sectionHeader: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  sectionHeaderText: {
+    fontSize: 13,
+    color: '#003B71',
+    fontFamily: 'Montserrat-SemiBold',
   },
   productCard: {
     backgroundColor: '#FFFFFF',
