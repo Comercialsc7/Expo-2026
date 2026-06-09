@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image, Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useNavigation } from '../hooks/useNavigation';
 import { useCachedOrdersStore, CachedOrder } from '../store/useCachedOrdersStore';
 import { OrderItem } from './components/OrderItem';
@@ -19,6 +21,98 @@ const syncWebhookUrl =
   Constants.expoConfig?.extra?.syncWebhookUrl ||
   '';
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value);
+
+const escapeHtml = (value: string) =>
+  String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const getDisplayOrderNumber = (order: CachedOrder) =>
+  order.shortOrderNumber || String(order.id || '').slice(-8);
+
+const buildOrderPdfHtml = (order: CachedOrder) => {
+  const itemsHtml = order.items
+    .map(
+      (item) => `
+        <tr>
+          <td>${escapeHtml(item.name)}</td>
+          <td style="text-align:center;">${item.quantity}</td>
+          <td style="text-align:right;">${formatCurrency(item.price)}</td>
+          <td style="text-align:right;">${formatCurrency(item.price * item.quantity)}</td>
+        </tr>
+      `
+    )
+    .join('');
+
+  return `
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          body { font-family: Arial, sans-serif; color: #222; padding: 20px; }
+          h1 { color: #003B71; margin: 0 0 8px; }
+          h2 { color: #003B71; margin: 20px 0 8px; font-size: 16px; }
+          .meta { margin-bottom: 4px; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+          th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+          th { background: #f3f6fb; text-align: left; }
+          .totals { margin-top: 16px; width: 100%; }
+          .totals td { border: none; padding: 4px 0; font-size: 13px; }
+          .totals .label { text-align: right; color: #666; padding-right: 8px; }
+          .totals .value { text-align: right; font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <h1>Pedido ${escapeHtml(getDisplayOrderNumber(order))}</h1>
+        <div class="meta">Cliente: ${escapeHtml(order.client.name)}</div>
+        <div class="meta">Código cliente: ${escapeHtml(order.client.code)}</div>
+        <div class="meta">CNPJ: ${escapeHtml(order.client.cnpj)}</div>
+        <div class="meta">Vendedor: ${escapeHtml(order.sellerCode || '-')}</div>
+        <div class="meta">Condição: ${escapeHtml(order.paymentTerm.description)} (${order.paymentTerm.prazo_dias || 0} dias)</div>
+        <div class="meta">Data: ${escapeHtml(new Date(order.timestamp).toLocaleString('pt-BR'))}</div>
+
+        <h2>Itens do Pedido</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th style="text-align:center;">Qtd</th>
+              <th style="text-align:right;">Valor</th>
+              <th style="text-align:right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <table class="totals">
+          <tr>
+            <td class="label">Subtotal:</td>
+            <td class="value">${formatCurrency(order.subtotal)}</td>
+          </tr>
+          <tr>
+            <td class="label">Desconto:</td>
+            <td class="value">${formatCurrency(order.discount || 0)}</td>
+          </tr>
+          <tr>
+            <td class="label">Total:</td>
+            <td class="value">${formatCurrency(order.total)}</td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+};
+
 export default function SyncOrdersScreen() {
   const syncTables = useMemo(
     () => ['teams', 'users', 'brands', 'prazos', 'relacao_prazo', 'clients', 'products', 'escalonada', 'pedidos'],
@@ -33,6 +127,7 @@ export default function SyncOrdersScreen() {
   const [isDeleteConfirmModalVisible, setIsDeleteConfirmModalVisible] = useState(false);
   const [orderIdToDelete, setOrderIdToDelete] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [sharingOrderId, setSharingOrderId] = useState<string | null>(null);
   const [requiresManualUpdate, setRequiresManualUpdate] = useState(false);
   const [showReconnectNotice, setShowReconnectNotice] = useState(false);
   const [lastNoticeDismissAt, setLastNoticeDismissAt] = useState<number | null>(null);
@@ -264,6 +359,37 @@ export default function SyncOrdersScreen() {
       Alert.alert('Erro', 'Falha ao baixar dados. Tente novamente.');
     }
   }, [download, syncTables]);
+
+  const handleShareOrderPdf = useCallback(async (order: CachedOrder) => {
+    try {
+      setSharingOrderId(order.id);
+      const html = buildOrderPdfHtml(order);
+
+      if (Platform.OS === 'web') {
+        await Print.printAsync({ html });
+        Alert.alert('PDF pronto', 'A visualização de impressão foi aberta. Escolha "Salvar como PDF" para compartilhar.');
+        return;
+      }
+
+      const result = await Print.printToFileAsync({ html });
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+
+      if (!isSharingAvailable) {
+        Alert.alert('Compartilhamento indisponível', 'Seu dispositivo não suporta compartilhamento de arquivos neste momento.');
+        return;
+      }
+
+      await Sharing.shareAsync(result.uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Compartilhar Pedido ${getDisplayOrderNumber(order)}`,
+      });
+    } catch (error) {
+      console.error('Erro ao compartilhar PDF do pedido:', error);
+      Alert.alert('Erro', 'Não foi possível gerar ou compartilhar o PDF deste pedido.');
+    } finally {
+      setSharingOrderId(null);
+    }
+  }, []);
 
   const handleFullSync = useCallback(async () => {
     try {
@@ -504,6 +630,8 @@ export default function SyncOrdersScreen() {
         order={selectedOrder}
         onClose={() => setSelectedOrder(null)}
         onDelete={handleDeleteOrder}
+        onSharePdf={handleShareOrderPdf}
+        sharingPdf={!!selectedOrder && sharingOrderId === selectedOrder.id}
         visible={!!selectedOrder && !isDeleteConfirmModalVisible}
       />
 

@@ -10,6 +10,8 @@ interface OrderDetailsModalProps {
   order: CachedOrder | null;
   onClose: () => void;
   onDelete: (orderId: string) => void;
+  onSharePdf: (order: CachedOrder) => void;
+  sharingPdf: boolean;
   visible: boolean;
 }
 
@@ -32,6 +34,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
   order, 
   onClose, 
   onDelete,
+  onSharePdf,
+  sharingPdf,
   visible
 }) => {
   if (!order) return null;
@@ -52,6 +56,13 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Detalhes do Pedido</Text>
             <View style={styles.modalHeaderButtons}>
+              <TouchableOpacity
+                style={[styles.shareButton, sharingPdf && styles.shareButtonDisabled]}
+                onPress={() => onSharePdf(order)}
+                disabled={sharingPdf}
+              >
+                <Text style={styles.shareButtonText}>{sharingPdf ? 'Gerando...' : 'PDF'}</Text>
+              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.deleteButton}
                 onPress={() => onDelete(order.id)}

@@ -209,6 +209,22 @@ export const styles = StyleSheet.create({
   },
   modalHeaderButtons: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  shareButton: {
+    marginRight: 12,
+    backgroundColor: '#003B71',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  shareButtonDisabled: {
+    opacity: 0.6,
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   deleteButton: {
     marginRight: 16,

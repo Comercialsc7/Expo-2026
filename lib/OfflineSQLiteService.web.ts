@@ -18,7 +18,9 @@ type TableStore = Record<string, Record<string, any>>;
 class OfflineSQLiteService {
   private static initialized = false;
   private static STORE_KEY = '__offline_sqlite_web_store__';
+  private static PENDING_OPS_SEQ_KEY = '__offline_sqlite_web_pending_ops_seq__';
   private static pendingOpsAutoId = 1;
+  private static pendingOpsSeqInitialized = false;
 
   private static ensureWebStorage(): Storage | null {
     if (typeof window === 'undefined' || !window.localStorage) {
@@ -48,6 +50,74 @@ class OfflineSQLiteService {
     } catch {
       // ignore write errors
     }
+  }
+
+  private static readPendingOpsSeq(): number {
+    const storage = this.ensureWebStorage();
+    if (!storage) return 0;
+
+    try {
+      const raw = storage.getItem(this.PENDING_OPS_SEQ_KEY);
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private static writePendingOpsSeq(nextId: number): void {
+    const storage = this.ensureWebStorage();
+    if (!storage) return;
+
+    try {
+      storage.setItem(this.PENDING_OPS_SEQ_KEY, String(nextId));
+    } catch {
+      // ignore write errors
+    }
+  }
+
+  private static clearPendingOpsSeq(): void {
+    const storage = this.ensureWebStorage();
+    if (!storage) return;
+
+    try {
+      storage.removeItem(this.PENDING_OPS_SEQ_KEY);
+    } catch {
+      // ignore write errors
+    }
+  }
+
+  private static ensurePendingOpsSeqInitialized(store: TableStore): void {
+    if (this.pendingOpsSeqInitialized) {
+      return;
+    }
+
+    const pendingOps = Object.values(store.pending_ops_sqlite || {}) as PendingOpRecord[];
+    const maxExistingId = pendingOps.reduce((max, row) => {
+      const id = Number(row?.id || 0);
+      return Number.isFinite(id) ? Math.max(max, id) : max;
+    }, 0);
+
+    const persistedSeq = this.readPendingOpsSeq();
+    const nextId = Math.max(maxExistingId, persistedSeq, 0) + 1;
+
+    this.pendingOpsAutoId = nextId;
+    this.pendingOpsSeqInitialized = true;
+    this.writePendingOpsSeq(this.pendingOpsAutoId);
+  }
+
+  private static reserveNextPendingOpId(store: TableStore): number {
+    this.ensurePendingOpsSeqInitialized(store);
+    const pendingOps = store.pending_ops_sqlite || {};
+
+    let id = this.pendingOpsAutoId;
+    while (pendingOps[String(id)]) {
+      id += 1;
+    }
+
+    this.pendingOpsAutoId = id + 1;
+    this.writePendingOpsSeq(this.pendingOpsAutoId);
+    return id;
   }
 
   static async init(): Promise<void> {
@@ -165,7 +235,10 @@ class OfflineSQLiteService {
       }
     }
 
-    const id = this.pendingOpsAutoId++;
+    const store = this.loadStore();
+    store.pending_ops_sqlite = store.pending_ops_sqlite || {};
+
+    const id = this.reserveNextPendingOpId(store);
     const row: PendingOpRecord = {
       id,
       table_name: tableName,
@@ -179,8 +252,6 @@ class OfflineSQLiteService {
       synced_at: null,
     };
 
-    const store = this.loadStore();
-    store.pending_ops_sqlite = store.pending_ops_sqlite || {};
     store.pending_ops_sqlite[String(id)] = row;
     this.saveStore(store);
 
@@ -248,6 +319,9 @@ class OfflineSQLiteService {
   static async clearAll(): Promise<void> {
     await this.init();
     this.saveStore({});
+    this.clearPendingOpsSeq();
+    this.pendingOpsAutoId = 1;
+    this.pendingOpsSeqInitialized = false;
   }
 
   static async getInfo(): Promise<any> {
