@@ -61,7 +61,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = React.memo(({
                 onPress={() => onShare(order)}
                 disabled={sharing}
               >
-                <Text style={styles.shareButtonText}>{sharing ? 'Compartilhando...' : 'Compartilhar'}</Text>
+                <Text style={styles.shareButtonText}>{sharing ? 'Gerando PDF...' : 'Compartilhar PDF'}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.deleteButton}

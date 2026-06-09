@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image, Share } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image, Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useNavigation } from '../hooks/useNavigation';
 import { useCachedOrdersStore, CachedOrder } from '../store/useCachedOrdersStore';
 import { OrderItem } from './components/OrderItem';
@@ -25,31 +27,224 @@ const formatCurrency = (value: number) =>
     currency: 'BRL'
   }).format(value);
 
+const escapeHtml = (value: string) =>
+  String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
 const getDisplayOrderNumber = (order: CachedOrder) =>
   order.shortOrderNumber || String(order.id || '').slice(-8);
 
-const buildOrderShareMessage = (order: CachedOrder) => {
-  const itemLines = order.items.map((item) => {
-    const totalItem = item.price * item.quantity;
-    return `- ${item.name} | Qtd: ${item.quantity} | Unit: ${formatCurrency(item.price)} | Total: ${formatCurrency(totalItem)}`;
-  });
+const buildOrderPdfHtml = (order: CachedOrder) => {
+  const itemsRows = order.items.length
+    ? order.items
+        .map((item) => {
+          const subtotal = item.price * item.quantity;
+          return `
+            <tr>
+              <td style="padding:10px 0;font-size:10px;color:#999;border-bottom:1px solid #f7f7f5;">${escapeHtml(item.code || '')}</td>
+              <td style="padding:10px 8px 10px 0;font-size:12px;font-weight:500;color:#1a1a1a;border-bottom:1px solid #f7f7f5;">${escapeHtml(item.name)}</td>
+              <td align="center" style="padding:10px 0;font-size:12px;color:#555;border-bottom:1px solid #f7f7f5;">${item.quantity}</td>
+              <td align="right" style="padding:10px 0;font-size:11px;color:#777;border-bottom:1px solid #f7f7f5;">${formatCurrency(item.price)}</td>
+              <td align="right" style="padding:10px 0;font-size:12px;font-weight:600;color:#1a1a1a;border-bottom:1px solid #f7f7f5;">${formatCurrency(subtotal)}</td>
+            </tr>
+          `;
+        })
+        .join('')
+    : '<tr><td colspan="5" style="padding:16px 0;font-size:13px;color:#aaa;text-align:center;">Nenhum produto encontrado.</td></tr>';
 
-  return [
-    `Pedido ${getDisplayOrderNumber(order)}`,
-    `Cliente: ${order.client.name}`,
-    `Codigo cliente: ${order.client.code}`,
-    `CNPJ: ${order.client.cnpj}`,
-    `Vendedor: ${order.sellerCode || '-'}`,
-    `Condição: ${order.paymentTerm.description} (${order.paymentTerm.prazo_dias || 0} dias)`,
-    `Data: ${new Date(order.timestamp).toLocaleString('pt-BR')}`,
-    '',
-    'Itens:',
-    ...itemLines,
-    '',
-    `Subtotal: ${formatCurrency(order.subtotal)}`,
-    `Desconto: ${formatCurrency(order.discount || 0)}`,
-    `Total: ${formatCurrency(order.total)}`,
-  ].join('\n');
+  const prizes = order.spinPrizes?.length
+    ? order.spinPrizes
+    : (order.spinPrize ? [order.spinPrize] : []);
+
+  const prizeRows = prizes.slice(0, 5).length
+    ? prizes.slice(0, 5).map((prize, index) => {
+        const isNoPrize = prize.type === 'no_prize';
+        const hasImage = !!prize.photo && prize.photo !== 'null' && prize.photo !== '[null]';
+        const imageCell = hasImage
+          ? `<img src="${escapeHtml(prize.photo || '')}" width="42" height="42" style="display:block;width:42px;height:42px;object-fit:cover;border-radius:8px;border:1px solid #eee;">`
+          : `<div style="width:42px;height:42px;border-radius:8px;background:#f5f5f3;border:1px dashed #ddd;text-align:center;line-height:42px;font-size:18px;">${isNoPrize ? '🙁' : '🎁'}</div>`;
+        const badge = isNoPrize
+          ? '<span style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.04em;">Sem prêmio</span>'
+          : '<span style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.04em;">Prêmio</span>';
+        const border = index < Math.min(prizes.length, 5) - 1 ? 'border-bottom:1px solid #f0f0ed;' : '';
+
+        return `
+          <table width="100%" cellpadding="0" cellspacing="0" style="${border}">
+            <tr>
+              <td width="56" style="vertical-align:middle;padding:10px 14px 10px 0;">${imageCell}</td>
+              <td style="vertical-align:middle;padding:10px 0;">
+                <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:2px;">${escapeHtml(prize.description || 'Prêmio')}</div>
+                <div style="font-size:11px;color:#bbb;margin-bottom:4px;">Giro ${index + 1} de ${Math.min(prizes.length, 5)}</div>
+                ${badge}
+              </td>
+            </tr>
+          </table>
+        `;
+      }).join('')
+    : '<div style="font-size:13px;color:#aaa;">Nenhum prêmio vinculado a este pedido.</div>';
+
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Novo Pedido</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f0ed;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0ed;padding:32px 16px;">
+  <tr>
+    <td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:12px;">
+            <table cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#00558f;border-radius:20px;padding:5px 12px;">
+                  <span style="font-size:10px;font-weight:700;color:#ffffff;letter-spacing:0.08em;text-transform:uppercase;">Novo pedido · ${escapeHtml(getDisplayOrderNumber(order))}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e2dc;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#00558f;">
+              <tr>
+                <td style="padding:22px 26px 20px 26px;border-bottom:1px solid #004a7a;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td>
+                        <div style="font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.02em;line-height:1.2;">${escapeHtml(order.client.name)}</div>
+                        <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:3px;">Cód. ${escapeHtml(order.client.code)} · Vendedor ${escapeHtml(order.sellerCode || '-')}</div>
+                      </td>
+                      <td align="right" style="vertical-align:top;">
+                        <div style="font-size:11px;color:rgba(255,255,255,0.55);">${escapeHtml(order.paymentTerm.description)} (${order.paymentTerm.prazo_dias || 0} dias)</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:20px 26px 0 26px;">
+                  <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Produtos</div>
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <thead>
+                      <tr>
+                        <th align="left" width="14%" style="font-size:9px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;padding-bottom:8px;border-bottom:1px solid #f0f0ed;">Código</th>
+                        <th align="left" style="font-size:9px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;padding-bottom:8px;border-bottom:1px solid #f0f0ed;">Descrição</th>
+                        <th align="center" width="8%" style="font-size:9px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;padding-bottom:8px;border-bottom:1px solid #f0f0ed;">Qtd</th>
+                        <th align="right" width="15%" style="font-size:9px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;padding-bottom:8px;border-bottom:1px solid #f0f0ed;">Unit.</th>
+                        <th align="right" width="18%" style="font-size:9px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;padding-bottom:8px;border-bottom:1px solid #f0f0ed;">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${itemsRows}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:0 26px 22px 26px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafaf8;border-radius:10px;padding:14px 16px;margin-top:16px;">
+                    <tr>
+                      <td style="padding-bottom:6px;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="font-size:12px;color:#999;">Subtotal</td>
+                            <td align="right" style="font-size:12px;color:#555;">${formatCurrency(order.subtotal)}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding-bottom:10px;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="font-size:12px;color:#999;">Desconto</td>
+                            <td align="right" style="font-size:12px;color:#059669;font-weight:600;">- ${formatCurrency(order.discount || 0)}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="border-top:1px solid #e8e8e4;padding-top:12px;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="font-size:13px;font-weight:600;color:#1a1a1a;">Total</td>
+                            <td align="right" style="font-size:20px;font-weight:700;color:#00558f;letter-spacing:-0.02em;">${formatCurrency(order.total)}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #f0f0ed;"></td></tr></table>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff2dc;border-top:1px solid #f59e0b;border-bottom:1px solid #f59e0b;">
+              <tr>
+                <td style="padding:14px 26px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td width="52" style="vertical-align:middle;padding-right:14px;">
+                        <div style="width:42px;height:42px;border-radius:9px;background:#fdc96b;text-align:center;line-height:42px;font-size:20px;">🎟️</div>
+                      </td>
+                      <td style="vertical-align:middle;">
+                        <div style="font-size:11px;color:#854f0b;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Bilhetes de sorteio</div>
+                        <div style="font-size:12px;color:#633806;">Este pedido gerou tickets para o sorteio</div>
+                      </td>
+                      <td align="right" style="vertical-align:middle;">
+                        <div style="display:inline-block;background:#00558f;color:#ffffff;font-size:12px;font-weight:700;border-radius:999px;padding:7px 14px;white-space:nowrap;">${order.ticketsMoto || 0} tickets</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
+            <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #f0f0ed;"></td></tr></table>
+
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:20px 26px 24px 26px;">
+                  <div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;">Prêmios vinculados</div>
+                  ${prizeRows}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:16px 0 0 0;text-align:center;">
+            <span style="font-size:11px;color:#bbb;">Mensagem automática · Sistema de pedidos da feira</span>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>
+  `;
 };
 
 export default function SyncOrdersScreen() {
@@ -302,15 +497,29 @@ export default function SyncOrdersScreen() {
   const handleShareOrder = useCallback(async (order: CachedOrder) => {
     try {
       setSharingOrderId(order.id);
-      const message = buildOrderShareMessage(order);
+      const html = buildOrderPdfHtml(order);
 
-      await Share.share({
-        title: `Pedido ${getDisplayOrderNumber(order)}`,
-        message,
+      if (Platform.OS === 'web') {
+        await Print.printAsync({ html });
+        Alert.alert('PDF pronto', 'A visualização de impressão foi aberta. Escolha "Salvar como PDF" para compartilhar.');
+        return;
+      }
+
+      const result = await Print.printToFileAsync({ html });
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+
+      if (!isSharingAvailable) {
+        Alert.alert('Compartilhamento indisponível', 'Seu dispositivo não suporta compartilhamento de arquivos neste momento.');
+        return;
+      }
+
+      await Sharing.shareAsync(result.uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Compartilhar Pedido ${getDisplayOrderNumber(order)}`,
       });
     } catch (error) {
-      console.error('Erro ao compartilhar pedido:', error);
-      Alert.alert('Erro', 'Não foi possível compartilhar este pedido.');
+      console.error('Erro ao compartilhar PDF do pedido:', error);
+      Alert.alert('Erro', 'Não foi possível gerar ou compartilhar o PDF deste pedido.');
     } finally {
       setSharingOrderId(null);
     }
