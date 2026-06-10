@@ -21,4 +21,8 @@ describe('calculateSpins', () => {
   it('limita o total ao máximo de 5 giros', () => {
     expect(calculateSpins(100000)).toBe(MAX_SPINS);
   });
+
+  it('limita o total ao máximo de 10 giros para cliente com pauta completa', () => {
+    expect(calculateSpins(100000, 10)).toBe(10);
+  });
 });

@@ -25,11 +25,14 @@ export default function OrderSummaryScreen() {
   const total = subtotal - desconto;
   const itens = orderItems.length;
   const prazo = paymentTerm?.description || '0';
+  const maxGiros = Number.isFinite(Number(client?.max_giros)) && Number(client?.max_giros) > 0
+    ? Math.floor(Number(client?.max_giros))
+    : MAX_SPINS;
 
-  const girosGanhos = calculateSpins(total);
+  const girosGanhos = calculateSpins(total, maxGiros);
   const girosRestantes = girosGanhos - results.length;
   const faltaGiro = SPIN_THRESHOLD - (total % SPIN_THRESHOLD) || 0;
-  const atingiuLimiteDeGiros = total >= MAX_SPINS * SPIN_THRESHOLD;
+  const atingiuLimiteDeGiros = total >= maxGiros * SPIN_THRESHOLD;
   const cuponsGanhos = Math.floor(total / 5000);
   const faltaParaMoto = (total % 5000 === 0 && total !== 0) ? 5000 : (5000 - (total % 5000));
 
@@ -191,6 +194,7 @@ export default function OrderSummaryScreen() {
         {girosRestantes > 0 && (
           <TouchableOpacity style={styles.spinButton} onPress={() => navigateTo('/(main)/create-order/spin-wheel', {
             girosDisponiveis: girosRestantes,
+            maxGiros,
             subtotal: subtotal,
             itens: itens,
             desconto: desconto,

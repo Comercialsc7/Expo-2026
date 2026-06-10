@@ -223,6 +223,7 @@ export default function SelectClient() {
           code, 
           cnpj, 
           address,
+          max_giros,
           equipe,
           repre
         `)

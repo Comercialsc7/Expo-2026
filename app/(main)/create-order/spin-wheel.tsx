@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useSpinResultsStore } from '../../../store/useSpinResultsStore';
 import { optimizeImage } from '../../../lib/imageUtils';
+import { MAX_SPINS } from '../../../lib/spinRewards';
 
 const premios = [
   'Kit Churrasco 14 peças Tramontina',
@@ -17,7 +18,10 @@ export default function SpinWheelScreen() {
   const [selected, setSelected] = useState(-1);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const params = useLocalSearchParams();
-  const girosDisponiveis = Math.min(5, Number(params.girosDisponiveis) || 0);
+  const maxGiros = Number.isFinite(Number(params.maxGiros)) && Number(params.maxGiros) > 0
+    ? Math.floor(Number(params.maxGiros))
+    : MAX_SPINS;
+  const girosDisponiveis = Math.min(maxGiros, Number(params.girosDisponiveis) || 0);
 
   const { addResult } = useSpinResultsStore();
 
@@ -97,6 +101,7 @@ export default function SpinWheelScreen() {
       pathname: isLastGiro ? '/(main)/create-order/collect-email' : '/(main)/create-order/spin-wheel',
       params: {
         girosDisponiveis: isLastGiro ? girosDisponiveis : girosDisponiveis - 1,
+        maxGiros,
         subtotal: params.subtotal,
         itens: params.itens,
         desconto: params.desconto,

@@ -27,6 +27,7 @@ export interface Client {
   name: string;
   code: string;
   cnpj: string;
+  max_giros?: number | null;
   equipe?: number;
   repre?: string;
   address?: string;
