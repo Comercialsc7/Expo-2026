@@ -78,10 +78,12 @@ export default function SpinWheelScreen() {
     // Add the "no prize" result to the store
     addResult({ prize: 'Não foi dessa vez', photoUri: '' });
 
-    // Navigate to email collection
+    // Navigate to email collection on last spin or continue spinning
     router.push({
-      pathname: '/(main)/create-order/collect-email',
+      pathname: isLastGiro ? '/(main)/create-order/collect-email' : '/(main)/create-order/spin-wheel',
       params: {
+        girosDisponiveis: isLastGiro ? girosDisponiveis : girosDisponiveis - 1,
+        maxGiros,
         subtotal: params.subtotal,
         itens: params.itens,
         desconto: params.desconto,
