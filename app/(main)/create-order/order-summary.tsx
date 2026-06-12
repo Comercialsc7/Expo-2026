@@ -25,12 +25,13 @@ export default function OrderSummaryScreen() {
   const total = subtotal - desconto;
   const itens = orderItems.length;
   const prazo = paymentTerm?.description || '0';
+  const hasAcceleratorItem = orderItems.some((item: OrderItem) => item.isAccelerator);
   const maxGiros = Number.isFinite(Number(client?.max_giros)) && Number(client?.max_giros) > 0
     ? Math.floor(Number(client?.max_giros))
     : MAX_SPINS;
 
-  const girosGanhos = calculateSpins(total, maxGiros);
-  const girosRestantes = girosGanhos - results.length;
+  const girosGanhos = hasAcceleratorItem ? calculateSpins(total, maxGiros) : 0;
+  const girosRestantes = Math.max(girosGanhos - results.length, 0);
   const faltaGiro = SPIN_THRESHOLD - (total % SPIN_THRESHOLD) || 0;
   const atingiuLimiteDeGiros = total >= maxGiros * SPIN_THRESHOLD;
   const cuponsGanhos = Math.floor(total / 5000);
@@ -170,7 +171,7 @@ export default function OrderSummaryScreen() {
           )}
         </View>
         <View style={styles.bottomSection}>
-          {!atingiuLimiteDeGiros && faltaGiro > 0 && (
+          {hasAcceleratorItem && !atingiuLimiteDeGiros && faltaGiro > 0 && (
             <View style={styles.giroLabelBox}>
               <Text style={styles.giroLabelText}>Faltam <Text style={styles.giroLabelValue}>R$ {faltaGiro.toFixed(2)}</Text> para o próximo giro da sorte</Text>
             </View>
@@ -191,7 +192,7 @@ export default function OrderSummaryScreen() {
           <Text style={styles.addButtonText}>Adicionar mais itens</Text>
         </TouchableOpacity>
         <View style={{ height: 5 }} />
-        {girosRestantes > 0 && (
+        {hasAcceleratorItem && girosRestantes > 0 && (
           <TouchableOpacity style={styles.spinButton} onPress={() => navigateTo('/(main)/create-order/spin-wheel', {
             girosDisponiveis: girosRestantes,
             maxGiros,
@@ -205,7 +206,7 @@ export default function OrderSummaryScreen() {
             <Text style={styles.spinButtonText}>Girar Roleta</Text>
           </TouchableOpacity>
         )}
-        {girosRestantes === 0 && (
+        {(!hasAcceleratorItem || girosRestantes === 0) && (
           <TouchableOpacity
             style={styles.finishButton}
             onPress={handleFinalizeOrder}
