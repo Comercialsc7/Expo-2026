@@ -14,14 +14,23 @@ const premios = [
   'Não foi dessa vez'
 ];
 
+const NO_PRIZE_CONFIRM_DELAY_MS = 900;
+
 export default function SpinWheelScreen() {
   const [selected, setSelected] = useState(-1);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [noPrizeReady, setNoPrizeReady] = useState(false);
   const params = useLocalSearchParams();
   const maxGiros = Number.isFinite(Number(params.maxGiros)) && Number(params.maxGiros) > 0
     ? Math.floor(Number(params.maxGiros))
     : MAX_SPINS;
   const girosDisponiveis = Math.min(maxGiros, Number(params.girosDisponiveis) || 0);
+  const girosGanhosInicial = Number.isFinite(Number(params.girosGanhosInicial)) && Number(params.girosGanhosInicial) > 0
+    ? Math.floor(Number(params.girosGanhosInicial))
+    : girosDisponiveis;
+  const giroAtual = Math.max(1, girosGanhosInicial - girosDisponiveis + 1);
+  const girosAposEste = Math.max(0, girosDisponiveis - 1);
 
   const { addResult } = useSpinResultsStore();
 
@@ -29,15 +38,23 @@ export default function SpinWheelScreen() {
   const isNoPrize = selected !== -1 && premios[selected] === 'Não foi dessa vez';
 
   useEffect(() => {
-    if (selected !== -1) {
-      if (isNoPrize) {
-        handleNoPrize();
-      } else if (capturedImage) {
-        handleConfirmGiro();
-      }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    if (isNoPrize) {
+      setNoPrizeReady(false);
+      timer = setTimeout(() => {
+        setNoPrizeReady(true);
+      }, NO_PRIZE_CONFIRM_DELAY_MS);
+    } else {
+      setNoPrizeReady(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, capturedImage]);
+
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [isNoPrize]);
 
   const takePhoto = async () => {
     try {
@@ -75,6 +92,9 @@ export default function SpinWheelScreen() {
   };
 
   const handleNoPrize = () => {
+    if (!isNoPrize || !noPrizeReady || isSubmitting) return;
+    setIsSubmitting(true);
+
     // Add the "no prize" result to the store
     addResult({ prize: 'Não foi dessa vez', photoUri: '' });
 
@@ -84,6 +104,7 @@ export default function SpinWheelScreen() {
       params: {
         girosDisponiveis: isLastGiro ? girosDisponiveis : girosDisponiveis - 1,
         maxGiros,
+        girosGanhosInicial,
         subtotal: params.subtotal,
         itens: params.itens,
         desconto: params.desconto,
@@ -94,6 +115,9 @@ export default function SpinWheelScreen() {
   };
 
   const handleConfirmGiro = () => {
+    if (selected === -1 || isNoPrize || !capturedImage || isSubmitting) return;
+    setIsSubmitting(true);
+
     const premioSelecionado = premios[selected];
 
     addResult({ prize: premioSelecionado, photoUri: capturedImage! });
@@ -104,6 +128,7 @@ export default function SpinWheelScreen() {
       params: {
         girosDisponiveis: isLastGiro ? girosDisponiveis : girosDisponiveis - 1,
         maxGiros,
+        girosGanhosInicial,
         subtotal: params.subtotal,
         itens: params.itens,
         desconto: params.desconto,
@@ -119,13 +144,24 @@ export default function SpinWheelScreen() {
         <Text style={styles.headerTitle}>Giro da Sorte</Text>
       </View>
       <View style={styles.content}>
+        <View style={styles.giroBadge}>
+          <Text style={styles.giroBadgeText}>Giro {giroAtual} de {girosGanhosInicial}</Text>
+          <Text style={styles.giroBadgeSubtext}>Restam {girosDisponiveis} giro(s)</Text>
+        </View>
+
         <Text style={styles.instruction}>Marque o Prêmio e tire uma{"\n"}foto de comprovação.</Text>
         <View style={styles.optionsList}>
           {premios.map((premio, idx) => (
             <TouchableOpacity
               key={premio}
               style={[styles.optionRow, selected === idx && styles.optionRowSelected]}
-              onPress={() => setSelected(idx)}
+              onPress={() => {
+                if (isSubmitting) return;
+                setSelected(idx);
+                if (premio === 'Não foi dessa vez') {
+                  setCapturedImage(null);
+                }
+              }}
               activeOpacity={0.8}
             >
               <View style={[styles.checkbox, selected === idx && styles.checkboxChecked]}>
@@ -139,7 +175,7 @@ export default function SpinWheelScreen() {
         {/* Only show photo button if a prize is selected and it's not "Não foi dessa vez" */}
         {selected !== -1 && !isNoPrize && (
           <>
-            <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
+            <TouchableOpacity style={styles.photoButton} onPress={takePhoto} disabled={isSubmitting}>
               <Image
                 source={capturedImage ? { uri: capturedImage } : require('../../../assets/images/EnviarFoto.png')}
                 style={styles.photoIcon}
@@ -149,14 +185,27 @@ export default function SpinWheelScreen() {
           </>
         )}
 
+        {isNoPrize && !noPrizeReady && (
+          <Text style={styles.feedbackText}>Opção marcada. Aguarde um instante para confirmar.</Text>
+        )}
+
         {/* Show confirmation button for "Não foi dessa vez" or when photo is captured */}
         {selected !== -1 && (isNoPrize || capturedImage) && (
           <TouchableOpacity
-            style={[styles.confirmButton, isLastGiro ? styles.confirmButtonWhite : styles.confirmButtonPurple]}
+            style={[
+              styles.confirmButton,
+              isLastGiro ? styles.confirmButtonWhite : styles.confirmButtonPurple,
+              (isSubmitting || (isNoPrize && !noPrizeReady)) && styles.confirmButtonDisabled,
+            ]}
             onPress={isNoPrize ? handleNoPrize : handleConfirmGiro}
+            disabled={isSubmitting || (isNoPrize && !noPrizeReady)}
           >
             <Text style={[styles.confirmButtonText, styles.confirmButtonTextPurple]}>
-              {isLastGiro ? 'Finalizar Giros' : 'Próximo Giro'}
+              {isSubmitting
+                ? 'Registrando...'
+                : isLastGiro
+                  ? 'Finalizar Giros'
+                  : `Próximo Giro (${girosAposEste} restante${girosAposEste === 1 ? '' : 's'})`}
             </Text>
           </TouchableOpacity>
         )}
@@ -186,6 +235,27 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     alignItems: 'center',
+  },
+  giroBadge: {
+    width: '100%',
+    borderRadius: 10,
+    backgroundColor: '#0d4f8d',
+    borderWidth: 1,
+    borderColor: '#ffffff66',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  giroBadgeText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Montserrat-Bold',
+  },
+  giroBadgeSubtext: {
+    color: '#ffffffcc',
+    fontSize: 12,
+    fontFamily: 'Montserrat-Medium',
+    marginTop: 2,
   },
   instruction: {
     color: '#fff',
@@ -263,6 +333,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat-Medium',
     marginBottom: 18,
   },
+  feedbackText: {
+    color: '#FFE08A',
+    fontSize: 13,
+    fontFamily: 'Montserrat-Medium',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
   confirmButton: {
     borderRadius: 12,
     marginTop: 12,
@@ -277,6 +354,9 @@ const styles = StyleSheet.create({
   },
   confirmButtonWhite: {
     backgroundColor: '#fff',
+  },
+  confirmButtonDisabled: {
+    opacity: 0.65,
   },
   confirmButtonText: {
     fontWeight: 'bold',

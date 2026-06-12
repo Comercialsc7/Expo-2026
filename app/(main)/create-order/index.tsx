@@ -71,12 +71,15 @@ export default function OrderSummary() {
       prazo: prazo.toString(),
     });
 
-    router.push('/create-order/order-summary', {
-      subtotal: subtotal.toFixed(2),
-      itens: itens.toString(),
-      desconto: desconto.toFixed(2),
-      total: total.toFixed(2),
-      prazo: prazo.toString(),
+    router.push({
+      pathname: '/create-order/order-summary',
+      params: {
+        subtotal: subtotal.toFixed(2),
+        itens: itens.toString(),
+        desconto: desconto.toFixed(2),
+        total: total.toFixed(2),
+        prazo: prazo.toString(),
+      },
     });
   };
 
