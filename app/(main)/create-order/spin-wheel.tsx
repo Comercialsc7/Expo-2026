@@ -200,11 +200,16 @@ export default function SpinWheelScreen() {
             onPress={isNoPrize ? handleNoPrize : handleConfirmGiro}
             disabled={isSubmitting || (isNoPrize && !noPrizeReady)}
           >
-            <Text style={[styles.confirmButtonText, styles.confirmButtonTextPurple]}>
+            <Text
+              style={[
+                styles.confirmButtonText,
+                isLastGiro ? styles.confirmButtonTextBlue : styles.confirmButtonTextPurple,
+              ]}
+            >
               {isSubmitting
                 ? 'Registrando...'
                 : isLastGiro
-                  ? 'Finalizar Giros'
+                  ? 'Continuar'
                   : `Próximo Giro (${girosAposEste} restante${girosAposEste === 1 ? '' : 's'})`}
             </Text>
           </TouchableOpacity>
@@ -364,5 +369,8 @@ const styles = StyleSheet.create({
   },
   confirmButtonTextPurple: {
     color: '#fff',
+  },
+  confirmButtonTextBlue: {
+    color: '#1560A8',
   },
 });
