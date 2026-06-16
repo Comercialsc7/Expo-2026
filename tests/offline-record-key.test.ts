@@ -50,4 +50,14 @@ describe('inferOfflineRecordKey', () => {
 
     expect(key).toBe('C100:28:99');
   });
+
+  it('gera chave estável para escalonada por cod + faixa', () => {
+    const key = inferOfflineRecordKey('escalonada', {
+      cod: '1001',
+      faixa: 3,
+      preco: 12.5,
+    });
+
+    expect(key).toBe('1001:3');
+  });
 });

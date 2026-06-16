@@ -3,6 +3,14 @@ export function inferOfflineRecordKey(tableName: string, record: any): string {
     return `${Date.now()}-${Math.random()}`;
   }
 
+  if (tableName === 'escalonada') {
+    const cod = String(record.cod ?? '').trim();
+    const faixa = String(record.faixa ?? '').trim();
+    if (cod && faixa) {
+      return `${cod}:${faixa}`;
+    }
+  }
+
   if (tableName === 'clients') {
     const id = String(record.id ?? '').trim();
     const code = String(record.code ?? '').trim();

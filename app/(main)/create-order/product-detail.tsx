@@ -141,7 +141,16 @@ export default function ProductDetail() {
           TableStore.get('escalonada'),
         ]);
 
-        const localRows = [...sqliteAll, ...(tableStoreAll as EscalonadaRow[])].filter(matchesSelectedCode);
+        const mergedLocalRows = [...sqliteAll, ...(tableStoreAll as EscalonadaRow[])].filter(matchesSelectedCode);
+        const uniqueLocalRowsMap = new Map<string, EscalonadaRow>();
+        for (const row of mergedLocalRows) {
+          const key = `${normalizeCode(row.cod)}:${String(row.faixa)}`;
+          if (!uniqueLocalRowsMap.has(key)) {
+            uniqueLocalRowsMap.set(key, row);
+          }
+        }
+        const localRows = Array.from(uniqueLocalRowsMap.values());
+
         if (isMounted && localRows.length > 0) {
           setEscalonadaRows(localRows);
           setHasAdjustedEscalonada(false);

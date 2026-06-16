@@ -125,9 +125,17 @@ class OfflineSQLiteService {
     this.initialized = true;
   }
 
-  private static inferRecordKey(record: any): string {
+  private static inferRecordKey(tableName: string, record: any): string {
     if (!record || typeof record !== 'object') {
       return `${Date.now()}-${Math.random()}`;
+    }
+
+    if (tableName === 'escalonada') {
+      const cod = String(record.cod ?? '').trim();
+      const faixa = String(record.faixa ?? '').trim();
+      if (cod && faixa) {
+        return `${cod}:${faixa}`;
+      }
     }
 
     const preferredKeys = ['_id', 'id', 'code', 'user_id', 'pedido_id'];
@@ -152,7 +160,7 @@ class OfflineSQLiteService {
     const table = store[tableName] || {};
 
     for (const record of records) {
-      const key = this.inferRecordKey(record);
+      const key = this.inferRecordKey(tableName, record);
       table[key] = record;
     }
 
