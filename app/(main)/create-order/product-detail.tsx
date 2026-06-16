@@ -8,7 +8,7 @@ import { supabase } from '../../../lib/supabase';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
 import TableStore from '../../../lib/TableStore';
 import { buildTierPriceOptions, EscalonadaRow, TierPriceOption } from '../../../lib/escalonadaPricing';
-import { fetchAdjustedPrice } from '../../../lib/priceAdjustment';
+import { fetchAdjustedEscalonadaRows, fetchAdjustedPrice } from '../../../lib/priceAdjustment';
 
 const formatBRL = (value: number) => Number(value || 0).toFixed(2).replace('.', ',');
 
@@ -75,6 +75,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState<string>('1');
   const [price, setPrice] = useState<string>('0,00');
   const [escalonadaRows, setEscalonadaRows] = useState<EscalonadaRow[]>([]);
+  const [hasAdjustedEscalonada, setHasAdjustedEscalonada] = useState(false);
   const [selectedFaixa, setSelectedFaixa] = useState<number | null>(null);
 
   useEffect(() => {
@@ -120,6 +121,7 @@ export default function ProductDetail() {
       if (!code) {
         if (isMounted) {
           setEscalonadaRows([]);
+          setHasAdjustedEscalonada(false);
         }
         return;
       }
@@ -142,12 +144,22 @@ export default function ProductDetail() {
         const localRows = [...sqliteAll, ...(tableStoreAll as EscalonadaRow[])].filter(matchesSelectedCode);
         if (isMounted && localRows.length > 0) {
           setEscalonadaRows(localRows);
+          setHasAdjustedEscalonada(false);
         }
       } catch (cacheError) {
         console.warn('⚠️ Falha ao ler escalonadas do cache local:', cacheError);
       }
 
       try {
+        const adjustedRows = await fetchAdjustedEscalonadaRows(String(client?.code || ''), String(code));
+        if (adjustedRows.length > 0) {
+          if (isMounted) {
+            setEscalonadaRows(adjustedRows);
+            setHasAdjustedEscalonada(true);
+          }
+          return;
+        }
+
         let rows: EscalonadaRow[] = [];
         let lastError: any = null;
 
@@ -176,6 +188,7 @@ export default function ProductDetail() {
 
         if (isMounted) {
           setEscalonadaRows(rows);
+          setHasAdjustedEscalonada(false);
         }
 
         if (rows.length > 0) {
@@ -191,7 +204,7 @@ export default function ProductDetail() {
     return () => {
       isMounted = false;
     };
-  }, [code]);
+  }, [code, client?.code]);
 
   const handleVariantChange = async (variantId: string) => {
     setSelectedVariantId(variantId);
@@ -206,6 +219,11 @@ export default function ProductDetail() {
   const handleSelectTier = async (tier: TierPriceOption) => {
     setSelectedFaixa(tier.faixa);
     setQuantity(String(tier.faixa));
+    if (hasAdjustedEscalonada) {
+      setPrice(formatBRL(Number(tier.boxPrice || 0)));
+      return;
+    }
+
     const adjusted = await fetchAdjustedPrice(String(client?.code || ''), Number(tier.boxPrice || 0));
     setPrice(formatBRL(adjusted));
   };

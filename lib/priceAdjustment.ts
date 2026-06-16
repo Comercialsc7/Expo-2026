@@ -2,6 +2,12 @@ type RpcAdjustedPriceRow = {
   adjusted_price?: number | string | null;
 };
 
+type RpcAdjustedEscalonadaRow = {
+  cod?: string | number | null;
+  faixa?: string | number | null;
+  preco?: string | number | null;
+};
+
 export const toPositiveNumberOrNull = (value: unknown): number | null => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -39,5 +45,42 @@ export const fetchAdjustedPrice = async (clientCode: string, basePrice: number):
   } catch (rpcError) {
     console.warn('⚠️ Falha ao buscar preço ajustado no backend. Mantendo preço base.', rpcError);
     return safeBasePrice;
+  }
+};
+
+export const fetchAdjustedEscalonadaRows = async (
+  clientCode: string,
+  productCode: string
+): Promise<Array<{ cod: string | number; faixa: string | number; preco: string | number }>> => {
+  const safeClientCode = String(clientCode || '').trim();
+  const safeProductCode = String(productCode || '').trim();
+
+  if (!safeClientCode || !safeProductCode) {
+    return [];
+  }
+
+  try {
+    const { supabase } = await import('./supabase');
+    const { data, error } = await supabase.rpc('get_adjusted_escalonada_for_client', {
+      p_client_code: safeClientCode,
+      p_product_code: safeProductCode,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const rows = ((data as RpcAdjustedEscalonadaRow[] | null) || [])
+      .map((row) => ({
+        cod: String(row?.cod ?? '').trim(),
+        faixa: row?.faixa ?? '',
+        preco: row?.preco ?? '',
+      }))
+      .filter((row) => String(row.cod).length > 0 && String(row.faixa).length > 0 && String(row.preco).length > 0);
+
+    return rows;
+  } catch (rpcError) {
+    console.warn('⚠️ Falha ao buscar escalonadas ajustadas no backend.', rpcError);
+    return [];
   }
 };
