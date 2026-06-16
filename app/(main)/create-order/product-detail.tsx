@@ -8,9 +8,10 @@ import { supabase } from '../../../lib/supabase';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
 import TableStore from '../../../lib/TableStore';
 import { buildTierPriceOptions, EscalonadaRow, TierPriceOption } from '../../../lib/escalonadaPricing';
-import { fetchAdjustedEscalonadaRows, fetchAdjustedPrice } from '../../../lib/priceAdjustment';
+import { fetchAdjustedEscalonadaRows, fetchAdjustedPrice, fetchClientPriceMultiplier } from '../../../lib/priceAdjustment';
 
 const formatBRL = (value: number) => Number(value || 0).toFixed(2).replace('.', ',');
+const roundTo2 = (value: number) => Number(Number(value || 0).toFixed(2));
 
 const normalizeCode = (value: unknown): string => {
   const raw = String(value ?? '').trim();
@@ -76,7 +77,25 @@ export default function ProductDetail() {
   const [price, setPrice] = useState<string>('0,00');
   const [escalonadaRows, setEscalonadaRows] = useState<EscalonadaRow[]>([]);
   const [hasAdjustedEscalonada, setHasAdjustedEscalonada] = useState(false);
+  const [clientPriceMultiplier, setClientPriceMultiplier] = useState(1);
   const [selectedFaixa, setSelectedFaixa] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadClientMultiplier = async () => {
+      const multiplier = await fetchClientPriceMultiplier(String(client?.code || ''));
+      if (isMounted) {
+        setClientPriceMultiplier(multiplier);
+      }
+    };
+
+    loadClientMultiplier();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [client?.code]);
 
   useEffect(() => {
     let isMounted = true;
@@ -113,6 +132,23 @@ export default function ProductDetail() {
     const qtdeEmb = Number(selectedVariant?.qtde || 1);
     return buildTierPriceOptions(escalonadaRows, emb, qtdeEmb);
   }, [escalonadaRows, selectedVariant]);
+
+  const displayTierPrices = useMemo(() => {
+    if (hasAdjustedEscalonada) {
+      return tierPrices;
+    }
+
+    const multiplier = Number(clientPriceMultiplier || 1);
+    return tierPrices.map((tier) => {
+      const adjustedUnit = roundTo2(Number(tier.unitPrice || 0) * multiplier);
+      const adjustedBox = roundTo2(Number(tier.boxPrice || 0) * multiplier);
+      return {
+        ...tier,
+        unitPrice: adjustedUnit,
+        boxPrice: adjustedBox,
+      };
+    });
+  }, [tierPrices, hasAdjustedEscalonada, clientPriceMultiplier]);
 
   useEffect(() => {
     let isMounted = true;
@@ -220,7 +256,7 @@ export default function ProductDetail() {
     setSelectedFaixa(null);
     const variant = variants.find((item) => item.id === variantId);
     if (variant) {
-      const adjusted = await fetchAdjustedPrice(String(client?.code || ''), Number(variant.price || 0));
+      const adjusted = roundTo2(Number(variant.price || 0) * Number(clientPriceMultiplier || 1));
       setPrice(formatBRL(adjusted));
     }
   };
@@ -228,13 +264,7 @@ export default function ProductDetail() {
   const handleSelectTier = async (tier: TierPriceOption) => {
     setSelectedFaixa(tier.faixa);
     setQuantity(String(tier.faixa));
-    if (hasAdjustedEscalonada) {
-      setPrice(formatBRL(Number(tier.boxPrice || 0)));
-      return;
-    }
-
-    const adjusted = await fetchAdjustedPrice(String(client?.code || ''), Number(tier.boxPrice || 0));
-    setPrice(formatBRL(adjusted));
+    setPrice(formatBRL(Number(tier.boxPrice || 0)));
   };
 
   const handleAddToOrder = () => {
@@ -306,7 +336,7 @@ export default function ProductDetail() {
                 }
               }}
               items={variants.map((variant) => ({
-                label: `${variant.emb} - QTDE ${variant.qtde}`,
+                label: `${variant.emb} - QTDE ${variant.qtde} - R$ ${formatBRL(roundTo2(Number(variant.price || 0) * Number(clientPriceMultiplier || 1)))}`,
                 value: variant.id,
               }))}
               style={{
@@ -323,10 +353,10 @@ export default function ProductDetail() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Escalonadas</Text>
-          {tierPrices.length === 0 ? (
+          {displayTierPrices.length === 0 ? (
             <Text style={styles.emptyTierText}>Sem faixas escalonadas para este produto.</Text>
           ) : (
-            tierPrices.map((tier) => (
+            displayTierPrices.map((tier) => (
               <TouchableOpacity
                 key={`${selectedVariant?.code || code}-${tier.faixa}`}
                 style={[

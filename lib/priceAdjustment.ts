@@ -48,6 +48,23 @@ export const fetchAdjustedPrice = async (clientCode: string, basePrice: number):
   }
 };
 
+export const fetchClientPriceMultiplier = async (clientCode: string): Promise<number> => {
+  const safeClientCode = String(clientCode || '').trim();
+  if (!safeClientCode) {
+    return 1;
+  }
+
+  try {
+    const adjusted = await fetchAdjustedPrice(safeClientCode, 100);
+    if (!Number.isFinite(adjusted) || adjusted <= 0) {
+      return 1;
+    }
+    return adjusted / 100;
+  } catch {
+    return 1;
+  }
+};
+
 export const fetchAdjustedEscalonadaRows = async (
   clientCode: string,
   productCode: string
