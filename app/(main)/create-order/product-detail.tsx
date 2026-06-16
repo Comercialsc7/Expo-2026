@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
 import TableStore from '../../../lib/TableStore';
 import { buildTierPriceOptions, EscalonadaRow, TierPriceOption } from '../../../lib/escalonadaPricing';
+import { fetchAdjustedPrice } from '../../../lib/priceAdjustment';
 
 const formatBRL = (value: number) => Number(value || 0).toFixed(2).replace('.', ',');
 
@@ -52,7 +53,7 @@ const buildCodeCandidates = (value: string): (string | number)[] => {
 
 export default function ProductDetail() {
   const params = useLocalSearchParams();
-  const { addItem } = useOrderStore();
+  const { addItem, client } = useOrderStore();
   const { getProductVariants, suppliers, loading } = useProducts();
 
   const codFor = Number(params.cod_for);
@@ -77,11 +78,28 @@ export default function ProductDetail() {
   const [selectedFaixa, setSelectedFaixa] = useState<number | null>(null);
 
   useEffect(() => {
-    if (variants.length > 0 && !selectedVariantId) {
-      setSelectedVariantId(variants[0].id);
-      setPrice(Number(variants[0].price || 0).toFixed(2).replace('.', ','));
-    }
-  }, [variants, selectedVariantId]);
+    let isMounted = true;
+
+    const setInitialVariantPrice = async () => {
+      if (variants.length === 0 || selectedVariantId) {
+        return;
+      }
+
+      const initialVariant = variants[0];
+      setSelectedVariantId(initialVariant.id);
+
+      const adjusted = await fetchAdjustedPrice(String(client?.code || ''), Number(initialVariant.price || 0));
+      if (isMounted) {
+        setPrice(formatBRL(adjusted));
+      }
+    };
+
+    setInitialVariantPrice();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [variants, selectedVariantId, client?.code]);
 
   const selectedVariant = useMemo(() => {
     return variants.find((variant) => variant.id === selectedVariantId) || variants[0];
@@ -175,19 +193,21 @@ export default function ProductDetail() {
     };
   }, [code]);
 
-  const handleVariantChange = (variantId: string) => {
+  const handleVariantChange = async (variantId: string) => {
     setSelectedVariantId(variantId);
     setSelectedFaixa(null);
     const variant = variants.find((item) => item.id === variantId);
     if (variant) {
-      setPrice(formatBRL(Number(variant.price || 0)));
+      const adjusted = await fetchAdjustedPrice(String(client?.code || ''), Number(variant.price || 0));
+      setPrice(formatBRL(adjusted));
     }
   };
 
-  const handleSelectTier = (tier: TierPriceOption) => {
+  const handleSelectTier = async (tier: TierPriceOption) => {
     setSelectedFaixa(tier.faixa);
     setQuantity(String(tier.faixa));
-    setPrice(formatBRL(tier.boxPrice));
+    const adjusted = await fetchAdjustedPrice(String(client?.code || ''), Number(tier.boxPrice || 0));
+    setPrice(formatBRL(adjusted));
   };
 
   const handleAddToOrder = () => {
@@ -253,7 +273,11 @@ export default function ProductDetail() {
           <View style={styles.selectContainer}>
             <RNPickerSelect
               value={selectedVariant.id}
-              onValueChange={handleVariantChange}
+              onValueChange={(value) => {
+                if (value) {
+                  void handleVariantChange(String(value));
+                }
+              }}
               items={variants.map((variant) => ({
                 label: `${variant.emb} - QTDE ${variant.qtde} - R$ ${Number(variant.price || 0).toFixed(2).replace('.', ',')}`,
                 value: variant.id,
@@ -282,7 +306,9 @@ export default function ProductDetail() {
                   styles.tierItem,
                   selectedFaixa === tier.faixa ? styles.tierItemSelected : null,
                 ]}
-                onPress={() => handleSelectTier(tier)}
+                onPress={() => {
+                  void handleSelectTier(tier);
+                }}
               >
                 <Text style={styles.tierText}>{tier.emb} qtde {tier.faixa}</Text>
                 <Text style={styles.tierUnitPrice}>und: {formatBRL(tier.unitPrice)}</Text>
