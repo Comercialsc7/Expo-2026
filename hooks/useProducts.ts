@@ -103,6 +103,7 @@ export const useProducts = () => {
 
   const fetchProducts = async () => {
     let hasCachedProducts = false;
+    let loadingReleasedByCache = false;
 
     try {
       setLoading(true);
@@ -117,6 +118,10 @@ export const useProducts = () => {
           );
           setProducts(sortedSQLiteProducts as Product[]);
           hasCachedProducts = true;
+          if (!loadingReleasedByCache) {
+            setLoading(false);
+            loadingReleasedByCache = true;
+          }
         }
 
         const cachedProducts = await TableStore.get('products');
@@ -126,6 +131,10 @@ export const useProducts = () => {
           );
           setProducts(sortedCachedProducts as Product[]);
           hasCachedProducts = true;
+          if (!loadingReleasedByCache) {
+            setLoading(false);
+            loadingReleasedByCache = true;
+          }
         }
       } catch (cacheReadError) {
         console.warn('⚠️ Falha ao ler produtos do cache local:', cacheReadError);

@@ -21,8 +21,8 @@ import OfflineSQLiteService from '../../lib/OfflineSQLiteService';
 import { getOptimizedRemoteImageUrl } from '../../lib/imageUtils';
 
 const Diamond = require('../../assets/images/diamond.png');
-const ACCELERATOR_IMAGE_PREFETCH_LIMIT = 30;
-const ACCELERATOR_IMAGE_PREFETCH_BATCH = 3;
+const ACCELERATOR_IMAGE_PREFETCH_LIMIT = 8;
+const ACCELERATOR_IMAGE_PREFETCH_BATCH = 2;
 
 interface Brand {
   id: string;
@@ -46,24 +46,28 @@ function SafeOptimizedImage({ uri, style, width, quality, progressive = false }:
     [originalUri, width, quality]
   );
   const [resolvedUri, setResolvedUri] = useState(optimizedUri || originalUri);
+  const [failedCompletely, setFailedCompletely] = useState(false);
 
   useEffect(() => {
     setResolvedUri(optimizedUri || originalUri);
+    setFailedCompletely(false);
   }, [optimizedUri, originalUri]);
 
   const handleError = useCallback(() => {
     if (resolvedUri !== originalUri) {
       setResolvedUri(originalUri);
+      return;
     }
+    setFailedCompletely(true);
   }, [originalUri, resolvedUri]);
 
-  if (!resolvedUri) {
-    return null;
+  if (!resolvedUri || failedCompletely) {
+    return <View style={[style, styles.productImagePlaceholder]} />;
   }
 
   return (
     <Image
-      source={{ uri: resolvedUri, cache: 'force-cache' }}
+      source={{ uri: resolvedUri }}
       style={style}
       progressiveRenderingEnabled={progressive && Platform.OS === 'android'}
       fadeDuration={0}
@@ -615,7 +619,7 @@ export default function OrdersScreen() {
     const uniqueUrls = Array.from(
       new Set(
         acceleratorProducts
-          .map((product) => getOptimizedRemoteImageUrl(product.image_url, { width: 220, quality: 40 }))
+          .map((product) => String(product.image_url || '').trim())
           .filter((url) => url.length > 0)
       )
     );

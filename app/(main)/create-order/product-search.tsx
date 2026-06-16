@@ -147,8 +147,8 @@ export default function ProductSearch() {
         renderItem={({ item, section }) => {
           const product = item;
           const isAccelerator =
-            product.is_acelerator === true ||
-            Number(product.is_acelerator) === 1;
+            String(product.is_acelerator).toLowerCase() === 'true' ||
+            String(product.is_acelerator) === '1';
 
           return (
             <TouchableOpacity
