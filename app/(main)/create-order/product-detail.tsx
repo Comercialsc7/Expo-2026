@@ -279,7 +279,7 @@ export default function ProductDetail() {
                 }
               }}
               items={variants.map((variant) => ({
-                label: `${variant.emb} - QTDE ${variant.qtde} - R$ ${Number(variant.price || 0).toFixed(2).replace('.', ',')}`,
+                label: `${variant.emb} - QTDE ${variant.qtde}`,
                 value: variant.id,
               }))}
               style={{
