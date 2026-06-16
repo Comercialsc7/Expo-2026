@@ -60,6 +60,11 @@ export const getOptimizedRemoteImageUrl = (
     return '';
   }
 
+  // No web/PWA, manter URL original reduz inconsistências de render/cache.
+  if (typeof window !== 'undefined') {
+    return original;
+  }
+
   const { width = 220, height, quality = 45 } = options;
 
   try {

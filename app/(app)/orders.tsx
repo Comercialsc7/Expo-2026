@@ -54,12 +54,18 @@ function SafeOptimizedImage({ uri, style, width, quality, progressive = false }:
   }, [optimizedUri, originalUri]);
 
   const handleError = useCallback(() => {
+    console.warn('Falha ao carregar imagem remota:', {
+      optimizedUri,
+      originalUri,
+      resolvedUri,
+    });
+
     if (resolvedUri !== originalUri) {
       setResolvedUri(originalUri);
       return;
     }
     setFailedCompletely(true);
-  }, [originalUri, resolvedUri]);
+  }, [optimizedUri, originalUri, resolvedUri]);
 
   if (!resolvedUri || failedCompletely) {
     return <View style={[style, styles.productImagePlaceholder]} />;

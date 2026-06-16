@@ -24,10 +24,15 @@ function SafeOptimizedImage({ uri, style, width, quality }: SafeOptimizedImagePr
   }, [optimizedUri, originalUri]);
 
   const handleError = useCallback(() => {
+    console.warn('Falha ao carregar imagem de produto:', {
+      optimizedUri,
+      originalUri,
+    });
+
     if (resolvedUri !== originalUri) {
       setResolvedUri(originalUri);
     }
-  }, [originalUri, resolvedUri]);
+  }, [optimizedUri, originalUri, resolvedUri]);
 
   if (!resolvedUri) {
     return null;
@@ -35,7 +40,7 @@ function SafeOptimizedImage({ uri, style, width, quality }: SafeOptimizedImagePr
 
   return (
     <Image
-      source={{ uri: resolvedUri, cache: 'force-cache' }}
+      source={{ uri: resolvedUri }}
       style={style}
       progressiveRenderingEnabled
       fadeDuration={0}
