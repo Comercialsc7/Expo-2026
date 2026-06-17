@@ -258,8 +258,8 @@ export default function Login() {
 
         setIsPreparingOffline(true);
 
-        const criticalTables = ['teams', 'products', 'clients', 'prazos', 'relacao_prazo'];
-        const allTables = ['teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo'];
+        const criticalTables = ['teams', 'products', 'clients', 'prazos', 'relacao_prazo', 'escalonada'];
+        const allTables = ['teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo', 'escalonada'];
 
         const preparation = await OfflineCache.prepare(
           allTables,
