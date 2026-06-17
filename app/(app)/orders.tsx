@@ -18,68 +18,16 @@ import { useProducts } from '../../hooks/useProducts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../lib/TableStore';
 import OfflineSQLiteService from '../../lib/OfflineSQLiteService';
-import { getOptimizedRemoteImageUrl } from '../../lib/imageUtils';
+import CachedImage from '../../components/shared/CachedImage';
+import ImageCacheService from '../../lib/ImageCacheService';
 
 const Diamond = require('../../assets/images/diamond.png');
-const ACCELERATOR_IMAGE_PREFETCH_LIMIT = 8;
-const ACCELERATOR_IMAGE_PREFETCH_BATCH = 2;
 
 interface Brand {
   id: string;
   name: string;
   image_url: string | null;
   created_at?: string;
-}
-
-interface SafeOptimizedImageProps {
-  uri: string;
-  style: any;
-  width: number;
-  quality: number;
-  progressive?: boolean;
-}
-
-function SafeOptimizedImage({ uri, style, width, quality, progressive = false }: SafeOptimizedImageProps) {
-  const originalUri = useMemo(() => String(uri || '').trim(), [uri]);
-  const optimizedUri = useMemo(
-    () => getOptimizedRemoteImageUrl(originalUri, { width, quality }),
-    [originalUri, width, quality]
-  );
-  const [resolvedUri, setResolvedUri] = useState(optimizedUri || originalUri);
-  const [failedCompletely, setFailedCompletely] = useState(false);
-
-  useEffect(() => {
-    setResolvedUri(optimizedUri || originalUri);
-    setFailedCompletely(false);
-  }, [optimizedUri, originalUri]);
-
-  const handleError = useCallback(() => {
-    console.warn('Falha ao carregar imagem remota:', {
-      optimizedUri,
-      originalUri,
-      resolvedUri,
-    });
-
-    if (resolvedUri !== originalUri) {
-      setResolvedUri(originalUri);
-      return;
-    }
-    setFailedCompletely(true);
-  }, [optimizedUri, originalUri, resolvedUri]);
-
-  if (!resolvedUri || failedCompletely) {
-    return <View style={[style, styles.productImagePlaceholder]} />;
-  }
-
-  return (
-    <Image
-      source={{ uri: resolvedUri }}
-      style={style}
-      progressiveRenderingEnabled={progressive && Platform.OS === 'android'}
-      fadeDuration={0}
-      onError={handleError}
-    />
-  );
 }
 
 const styles = StyleSheet.create({
@@ -630,31 +578,16 @@ export default function OrdersScreen() {
       )
     );
 
-    const pendingUrls = uniqueUrls
-      .filter((url) => !prefetchedAcceleratorUrlsRef.current.has(url))
-      .slice(0, ACCELERATOR_IMAGE_PREFETCH_LIMIT);
-
-    const prefetchInBatches = async () => {
-      for (let i = 0; i < pendingUrls.length; i += ACCELERATOR_IMAGE_PREFETCH_BATCH) {
-        if (isCancelled) {
-          return;
-        }
-
-        const batch = pendingUrls.slice(i, i + ACCELERATOR_IMAGE_PREFETCH_BATCH);
-        const settled = await Promise.allSettled(batch.map((url) => Image.prefetch(url)));
-
-        settled.forEach((result, index) => {
-          if (result.status === 'fulfilled' && result.value) {
-            prefetchedAcceleratorUrlsRef.current.add(batch[index]);
-          }
-        });
-      }
-    };
+    const pendingUrls = uniqueUrls.filter(
+      (url) => !prefetchedAcceleratorUrlsRef.current.has(url)
+    );
 
     if (pendingUrls.length > 0) {
-      prefetchInBatches().catch((error) => {
-        console.warn('Falha no prefetch de imagens dos aceleradores:', error);
-      });
+      ImageCacheService.prefetchMany(pendingUrls)
+        .then(() => {
+          pendingUrls.forEach((url) => prefetchedAcceleratorUrlsRef.current.add(url));
+        })
+        .catch((err) => console.warn('Falha no prefetch de imagens:', err));
     }
 
     return () => {
@@ -729,15 +662,15 @@ export default function OrdersScreen() {
               >
                 <View style={styles.brandImageContainer}>
                   {brand.image_url ? (
-                    <SafeOptimizedImage
+                    <CachedImage
                       uri={brand.image_url}
                       style={styles.brandImage}
                       width={120}
                       quality={40}
                     />
                   ) : (
-                    <View style={styles.brandImagePlaceholder}>
-                      <Text style={styles.brandImagePlaceholderText}>Sem imagem</Text>
+                    <View style={styles.productImagePlaceholder}>
+                      <Text style={styles.productImagePlaceholderText}>Sem imagem</Text>
                     </View>
                   )}
                 </View>
@@ -776,7 +709,7 @@ export default function OrdersScreen() {
                     style={styles.productDiamondBadge}
                   />
                   {product.image_url ? (
-                    <SafeOptimizedImage
+                    <CachedImage
                       uri={product.image_url}
                       style={styles.productImage}
                       width={220}

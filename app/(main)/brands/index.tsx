@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Image, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
+import CachedImage from '../../../components/shared/CachedImage';
 
 interface Brand {
   id: string;
@@ -43,7 +44,7 @@ export default function BrandsScreen() {
       onPress={() => router.push(`/brands/${item.id}`)}
     >
       {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={styles.brandImage} />
+        <CachedImage uri={item.image_url} style={styles.brandImage} width={80} quality={50} />
       ) : (
         <View style={styles.brandImagePlaceholder}>
           <Text style={styles.brandInitial}>{item.code}</Text>

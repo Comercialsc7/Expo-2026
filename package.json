@@ -16,19 +16,23 @@
     "ios": "npx expo run:ios"
   },
   "dependencies": {
+    "@expo/metro-config": "~0.20.18",
     "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-picker/picker": "2.11.1",
     "@supabase/supabase-js": "^2.49.10",
     "@types/node": "^24.0.1",
     "base64-arraybuffer": "^1.0.2",
-    "expo": "^53.0.11",
+    "expo": "~53.0.27",
     "expo-camera": "~16.1.6",
-    "expo-constants": "~17.1.6",
+    "expo-constants": "~17.1.8",
+    "expo-file-system": "~18.1.11",
     "expo-font": "~13.3.1",
     "expo-image-manipulator": "~13.1.7",
     "expo-image-picker": "~16.1.4",
     "expo-linear-gradient": "~14.1.4",
+    "expo-linking": "~7.1.7",
     "expo-print": "~14.1.4",
-    "expo-router": "~5.1.0",
+    "expo-router": "~5.1.11",
     "expo-sharing": "~13.1.5",
     "expo-splash-screen": "~0.30.8",
     "expo-sqlite": "~15.2.14",
@@ -39,7 +43,7 @@
     "prop-types": "^15.8.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-native": "^0.79.3",
+    "react-native": "0.79.6",
     "react-native-dotenv": "^3.4.11",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-picker-select": "^9.3.1",
@@ -58,7 +62,7 @@
     "dotenv": "^17.2.3",
     "eslint": "^9.39.1",
     "eslint-config-expo": "~9.2.0",
-    "typescript": "^5.3.3",
+    "typescript": "~5.8.3",
     "vitest": "^3.2.4"
   },
   "resolutions": {
@@ -72,7 +76,8 @@
         "exclude": [
           "react-native-confetti-cannon",
           "@lucide/lab",
-          "prop-types"
+          "prop-types",
+          "react-native-dotenv"
         ],
         "listUnknownPackages": false
       }

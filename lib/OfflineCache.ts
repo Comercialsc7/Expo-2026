@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import TableStore from './TableStore';
 import SQLiteStore from './SQLiteStore';
 import OfflineSQLiteService from './OfflineSQLiteService';
+import ImageCacheService from './ImageCacheService';
 
 /**
  * OfflineCache - Sistema de pré-cache para funcionar offline
@@ -100,6 +101,11 @@ class OfflineCache {
           : `⚠️ [OfflineCache] Preparação concluída com ${errors.length} erros`
       );
 
+      // 4. Pré-baixar imagens de marcas e produtos em background (não bloqueia).
+      this._prefetchImagesInBackground(successfulTables).catch((err) =>
+        console.warn('⚠️ [OfflineCache] Erro no prefetch de imagens:', err)
+      );
+
       return { success, cached, errors };
     } catch (error) {
       console.error('❌ [OfflineCache] Erro ao preparar offline:', error);
@@ -110,6 +116,31 @@ class OfflineCache {
   /**
    * Salva sessão de autenticação no AsyncStorage
    */
+  private static async _prefetchImagesInBackground(cachedTables: string[]): Promise<void> {
+    const imageTables = ['brands', 'products'];
+    const urlFields: Record<string, string> = { brands: 'image_url', products: 'image_url' };
+
+    for (const table of imageTables) {
+      if (!cachedTables.includes(table)) continue;
+
+      try {
+        const rows = await OfflineSQLiteService.getAll(table);
+        const field = urlFields[table];
+        const urls = rows
+          .map((row: any) => String(row?.[field] || '').trim())
+          .filter((url) => url.length > 0);
+
+        if (urls.length > 0) {
+          console.log(`🖼️ [OfflineCache] Pré-baixando ${urls.length} imagens de '${table}'...`);
+          await ImageCacheService.prefetchMany(urls);
+          console.log(`✅ [OfflineCache] Imagens de '${table}' em cache local`);
+        }
+      } catch (err) {
+        console.warn(`⚠️ [OfflineCache] Falha ao pré-baixar imagens de '${table}':`, err);
+      }
+    }
+  }
+
   private static async saveSession(): Promise<boolean> {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
