@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createTimeoutFetch, DEFAULT_NETWORK_TIMEOUT_MS } from './network';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || Constants.expoConfig?.extra?.supabaseUrl || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || Constants.expoConfig?.extra?.supabaseAnonKey || '';
@@ -23,6 +24,7 @@ const supabaseConfig = {
     ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),
   },
   global: {
+    fetch: createTimeoutFetch(DEFAULT_NETWORK_TIMEOUT_MS),
     headers: {
       'X-Client-Info': `expo-${Platform.OS}`,
     },

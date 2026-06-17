@@ -7,12 +7,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../../lib/TableStore';
 import OfflineSQLiteService from '../../../lib/OfflineSQLiteService';
 import SQLiteStore from '../../../lib/SQLiteStore';
+import { withTimeoutFallback } from '../../../lib/asyncTimeout';
+import { mergeClientLists } from '../../../lib/offlineClientList';
 
 const CASH_ONLY_PAYMENT_TERM: PaymentTerm = {
   id: 'cash-only',
   description: 'À Vista',
   prazo_dias: 0,
 };
+
+const PAYMENT_TERMS_FETCH_TIMEOUT_MS = 3000;
 
 const mergeByKey = (
   existing: any[],
@@ -233,7 +237,11 @@ export default function SelectClient() {
       if (error) throw error;
 
       const fetchedClients = (data as Client[] || []);
-      setClients(fetchedClients);
+
+      // Nunca reduz a lista visível por resposta parcial/intermitente da rede.
+      if (fetchedClients.length > 0) {
+        setClients((current) => mergeClientLists(current, fetchedClients));
+      }
 
       if (fetchedClients.length > 0) {
         try {
@@ -288,16 +296,23 @@ export default function SelectClient() {
   );
 
   const handleSelectClient = useCallback(async (client: Client) => {
+    // Navega imediatamente com fallback local para evitar travamento sem rede.
+    setClient({ ...client, payment_terms: [CASH_ONLY_PAYMENT_TERM] as any });
+    router.push('/create-order/payment-method');
+
     try {
-      const paymentTerms = await getPaymentTermsWithFallback(client.code);
+      const paymentTerms = await withTimeoutFallback(
+        getPaymentTermsWithFallback(client.code),
+        PAYMENT_TERMS_FETCH_TIMEOUT_MS,
+        [CASH_ONLY_PAYMENT_TERM]
+      );
       const safePaymentTerms = paymentTerms.length > 0 ? paymentTerms : [CASH_ONLY_PAYMENT_TERM];
 
-      // Passar o cliente com os prazos permitidos para o store
       setClient({ ...client, payment_terms: safePaymentTerms as any });
-      router.push('/create-order/payment-method');
     } catch (error) {
       console.error('Erro ao buscar condições de pagamento do cliente:', error);
-      alert('Erro ao buscar condições de pagamento do cliente.');
+      // Mantém fallback para não bloquear o fluxo offline.
+      setClient({ ...client, payment_terms: [CASH_ONLY_PAYMENT_TERM] as any });
     }
   }, [getPaymentTermsWithFallback, setClient]);
 

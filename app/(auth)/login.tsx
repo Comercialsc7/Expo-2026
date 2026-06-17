@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TableStore from '../../lib/TableStore';
 import OfflineCache from '../../lib/OfflineCache';
+import { isLikelyOnline } from '../../lib/network';
 
 const logoDmuller = require('../../assets/images/logoDmuller.png');
 
@@ -21,8 +22,19 @@ export default function Login() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [isOffline, setIsOffline] = useState(false);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [isPreparingOffline, setIsPreparingOffline] = useState(false);
 
   const codeInputRef = useRef<TextInput>(null);
+  const probeUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+
+  const detectOnline = async () => {
+    return isLikelyOnline({
+      platformOS: Platform.OS,
+      navigatorOnLine: Platform.OS === 'web' ? navigator.onLine : undefined,
+      probeUrl,
+      timeoutMs: 2500,
+    });
+  };
 
   useEffect(() => {
     fetchTeams();
@@ -44,7 +56,7 @@ export default function Login() {
       console.log('🔄 Iniciando busca de equipes...', forceRefresh ? '(forçando atualização)' : '');
 
       // Verifica se está online
-      const online = Platform.OS === 'web' ? navigator.onLine : true;
+      const online = await detectOnline();
       setIsOffline(!online);
 
       if (online) {
@@ -170,6 +182,10 @@ export default function Login() {
   };
 
   const handleLogin = async () => {
+    if (isPreparingOffline) {
+      return;
+    }
+
     console.log('Selected Team:', selectedTeam);
     console.log('Code:', code);
 
@@ -186,7 +202,7 @@ export default function Login() {
     let performOfflineLogin = false;
 
     // Tenta Login Online Primeiro
-    const online = Platform.OS === 'web' ? navigator.onLine : true;
+    const online = await detectOnline();
 
     if (online) {
       try {
@@ -240,19 +256,33 @@ export default function Login() {
         await TableStore.set('users', userData);
         console.log('✅ Login Online Sucesso. Usuário cacheado.');
 
-        // Dispara preparação do cache em background.
-        // Para clients, filtra apenas os clientes do vendedor logado
-        // (evita baixar/cachear os 20k clientes inteiros).
-        OfflineCache.prepare(
-          ['teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo'],
-          { clients: { equipe: Number(selectedTeam), repre: representativeCode } }
-        ).catch(console.error);
+        setIsPreparingOffline(true);
 
+        const criticalTables = ['teams', 'products', 'clients', 'prazos', 'relacao_prazo'];
+        const allTables = ['teams', 'products', 'clients', 'brands', 'users', 'pedidos', 'prazos', 'relacao_prazo'];
+
+        const preparation = await OfflineCache.prepare(
+          allTables,
+          { clients: { equipe: Number(selectedTeam), repre: representativeCode } }
+        );
+
+        const missingCritical = criticalTables.filter((table) => preparation.errors.includes(table));
+        if (missingCritical.length > 0) {
+          Alert.alert(
+            'Sincronização incompleta',
+            `Não foi possível preparar os dados offline essenciais: ${missingCritical.join(', ')}. Tente novamente com conexão estável.`
+          );
+          setIsPreparingOffline(false);
+          return;
+        }
+
+        setIsPreparingOffline(false);
         blurFocusedElementWeb();
         router.push('/(app)/orders');
         return;
 
       } catch (error) {
+        setIsPreparingOffline(false);
         console.log('⚠️ Login online falhou, tentando fallback offline...', error);
         performOfflineLogin = true;
       }
@@ -289,6 +319,15 @@ export default function Login() {
           await AsyncStorage.setItem('representativeCodeToStore', representativeCode);
           await AsyncStorage.setItem('representanteNome', foundUser.name);
           await saveRepresentativeHistory(representativeCode);
+
+          const offlineStatus = await OfflineCache.isReady();
+          if (!offlineStatus.ready) {
+            Alert.alert(
+              'Dados offline insuficientes',
+              'Este aparelho ainda não concluiu o download offline obrigatório. Conecte-se e faça login online para preparar os dados.'
+            );
+            return;
+          }
 
           console.log('✅ Login Offline Sucesso');
           blurFocusedElementWeb();
@@ -375,8 +414,12 @@ export default function Login() {
             />
           </View>
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>Entrar</Text>
+          <TouchableOpacity
+            style={[styles.loginButton, isPreparingOffline && styles.loginButtonDisabled]}
+            onPress={handleLogin}
+            disabled={isPreparingOffline}
+          >
+            <Text style={styles.loginButtonText}>{isPreparingOffline ? 'Preparando offline...' : 'Entrar'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -513,5 +556,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Montserrat-Bold',
     textTransform: 'uppercase',
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
 });

@@ -19,9 +19,12 @@ class OfflineCache {
     CACHED_AT: '@app:cached_at',
     TABLES_CACHED: '@app:tables_cached',
     SESSION_LAST_VALIDATED_AT: '@app:session_last_validated_at',
+    TABLE_CHECKPOINTS: '@app:table_checkpoints',
   };
 
   private static SESSION_OFFLINE_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
+  private static CACHE_BATCH_SIZE = 500;
+  private static TABLESTORE_MAX_SAFE_ROWS = 1500;
 
   /**
    * Prepara o app para trabalhar offline
@@ -151,6 +154,62 @@ class OfflineCache {
     }
   }
 
+  private static async getTableCheckpoints(): Promise<Record<string, number>> {
+    try {
+      const raw = await AsyncStorage.getItem(this.KEYS.TABLE_CHECKPOINTS);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private static async saveTableCheckpoint(table: string, offset: number): Promise<void> {
+    const checkpoints = await this.getTableCheckpoints();
+    checkpoints[table] = Math.max(0, Number(offset) || 0);
+    await AsyncStorage.setItem(this.KEYS.TABLE_CHECKPOINTS, JSON.stringify(checkpoints));
+  }
+
+  private static async clearTableCheckpoint(table: string): Promise<void> {
+    const checkpoints = await this.getTableCheckpoints();
+    if (table in checkpoints) {
+      delete checkpoints[table];
+      await AsyncStorage.setItem(this.KEYS.TABLE_CHECKPOINTS, JSON.stringify(checkpoints));
+    }
+  }
+
+  private static async fetchTableBatch(
+    table: string,
+    offset: number,
+    limit: number,
+    filters?: Record<string, string | number>
+  ): Promise<any[]> {
+    let query = supabase
+      .from(table)
+      .select('*')
+      .range(offset, offset + limit - 1) as any;
+
+    if (filters) {
+      for (const [key, value] of Object.entries(filters)) {
+        query = query.eq(key, value);
+      }
+    }
+
+    let result: { data: any[] | null; error: any };
+    try {
+      result = await query.order('created_at', { ascending: false });
+    } catch {
+      result = await query;
+    }
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    return result.data || [];
+  }
+
   /**
    * Faz cache de uma tabela do Supabase.
    * @param filters Filtros opcionais aplicados via .eq() na query (ex.: { equipe: 2, repre: '3272' }).
@@ -162,44 +221,49 @@ class OfflineCache {
   ): Promise<number> {
     console.log(`🔎 [OfflineCache] Iniciando download de tabela '${table}' do Supabase`);
 
-    let baseQuery = supabase.from(table).select('*') as any;
+    const checkpoints = await this.getTableCheckpoints();
+    let offset = Math.max(0, Number(checkpoints[table] || 0));
+    let totalDownloaded = 0;
+    let hasMore = true;
+    const tableStoreBuffer: any[] = [];
 
-    // Aplica filtros antes do order (ex.: equipe + repre para clients).
-    if (filters) {
-      for (const [key, value] of Object.entries(filters)) {
-        baseQuery = baseQuery.eq(key, value);
+    while (hasMore) {
+      const batch = await this.fetchTableBatch(
+        table,
+        offset,
+        this.CACHE_BATCH_SIZE,
+        filters
+      );
+
+      if (batch.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      await OfflineSQLiteService.upsertMany(table, batch);
+      totalDownloaded += batch.length;
+      offset += batch.length;
+      await this.saveTableCheckpoint(table, offset);
+
+      if (tableStoreBuffer.length < this.TABLESTORE_MAX_SAFE_ROWS) {
+        const remaining = this.TABLESTORE_MAX_SAFE_ROWS - tableStoreBuffer.length;
+        tableStoreBuffer.push(...batch.slice(0, remaining));
+      }
+
+      if (batch.length < this.CACHE_BATCH_SIZE) {
+        hasMore = false;
       }
     }
 
-    // Tenta ordenar por created_at; algumas tabelas podem não ter essa coluna.
-    let data: any[] | null = null;
-    let error: any = null;
-    try {
-      const result = await baseQuery.order('created_at', { ascending: false });
-      data = result.data;
-      error = result.error;
-    } catch {
-      const result = await baseQuery;
-      data = result.data;
-      error = result.error;
+    if (tableStoreBuffer.length > 0) {
+      await TableStore.set(table, tableStoreBuffer);
     }
 
-    if (error) {
-      console.error(`❌ [OfflineCache] Erro ao baixar tabela '${table}':`, error);
-      throw error;
-    }
+    await this.clearTableCheckpoint(table);
 
-    const count = data ? data.length : 0;
-    console.log(`ℹ️ [OfflineCache] Tabela '${table}' - registros recebidos: ${count}`);
+    console.log(`ℹ️ [OfflineCache] Tabela '${table}' - registros baixados: ${totalDownloaded}`);
 
-    if (data && data.length > 0) {
-      await TableStore.set(table, data);
-      // Persiste também no OfflineSQLiteService para que getAllWhere funcione no offline.
-      await OfflineSQLiteService.upsertMany(table, data);
-      return data.length;
-    }
-
-    return 0;
+    return totalDownloaded;
   }
 
   /**
@@ -285,6 +349,7 @@ class OfflineCache {
       await AsyncStorage.removeItem(this.KEYS.CACHED_AT);
       await AsyncStorage.removeItem(this.KEYS.TABLES_CACHED);
       await AsyncStorage.removeItem(this.KEYS.SESSION_LAST_VALIDATED_AT);
+      await AsyncStorage.removeItem(this.KEYS.TABLE_CHECKPOINTS);
 
       // Limpa espelho SQLite tabela a tabela para evitar resíduos locais.
       for (const table of cachedTables) {

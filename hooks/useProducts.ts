@@ -4,6 +4,7 @@ import TableStore from '../lib/TableStore';
 import OfflineSQLiteService from '../lib/OfflineSQLiteService';
 import OfflineMutationQueue from '../lib/OfflineMutationQueue';
 import { debugLog } from '../lib/logger';
+import { isLikelyOnline } from '../lib/network';
 
 export interface Product {
   id: string;
@@ -138,6 +139,22 @@ export const useProducts = () => {
         }
       } catch (cacheReadError) {
         console.warn('⚠️ Falha ao ler produtos do cache local:', cacheReadError);
+      }
+
+      const probeUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+      const online = await isLikelyOnline({
+        probeUrl,
+        timeoutMs: 2500,
+      });
+
+      if (!online) {
+        if (!hasCachedProducts && products.length === 0) {
+          setError('Sem conexão e sem produtos em cache.');
+        }
+        if (!loadingReleasedByCache) {
+          setLoading(false);
+        }
+        return;
       }
 
       // Buscar TODOS os produtos em lotes para evitar timeouts
